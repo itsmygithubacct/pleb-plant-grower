@@ -4,6 +4,7 @@
 #include "pg_ui.h"
 
 #include "pg_calendar.h"
+#include "pg_actions.h"
 #include "pg_care.h"
 #include "pg_content.h"
 #include "pg_plant.h"
@@ -539,5 +540,46 @@ void pg_ui_draw(ki_td_soft_renderer *renderer, const ki_td_view *view,
         break;
     default:
         break;
+    }
+}
+
+/* ---- pg_update: one 60 Hz frame ----------------------------------------
+ *
+ * Animation, UI and input. Advances no biology whatsoever -- that is
+ * pg_advance's job and it is driven by the wall clock, not by frames. Keeping
+ * the two apart is what lets a 30-day absence and a 30-day-fast-forward
+ * produce identical state, and it is why this function may be called at any
+ * rate, or not at all, without changing the plant.
+ */
+void pg_update(pg_state *state, const pg_input *in, double step_seconds)
+{
+    pg_verb verb;
+
+    (void)step_seconds;
+    if (state == NULL || in == NULL) {
+        return;
+    }
+    /* The UI gets first refusal. A key that moved a menu cursor must not also
+     * water the plant. */
+    if (pg_ui_input(&state->ui, in, state)) {
+        return;
+    }
+    if (state->plant_count == 0u) {
+        return;
+    }
+    /* The chooser commits on its confirm step rather than acting on a verb. */
+    if (state->ui.screen == (uint8_t)PG_SCREEN_CHOOSER) {
+        if (state->ui.chooser_step == (uint8_t)PG_CHOOSER_CONFIRM &&
+            in->confirm) {
+            pg_plant_init(&state->plants[0], state->ui.chooser_species,
+                          state->ui.chooser_pot, (uint8_t)PG_SPOT_DEFAULT,
+                          state->anchor.last_wall_s);
+            pg_ui_goto(&state->ui, (uint8_t)PG_SCREEN_PLANT);
+        }
+        return;
+    }
+    verb = pg_actions_verb_for_input(in);
+    if (verb < PG_VERB_COUNT) {
+        (void)pg_actions_apply(state, 0u, verb, 0u, NULL);
     }
 }

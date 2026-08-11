@@ -19,7 +19,13 @@
 #include "pg_render.h"
 #include "pg_save.h"
 #include "pg_sim.h"
+#include "pg_state.h"
+#include "pg_term.h"
 #include "pg_time.h"
+#include "pg_ui.h"
+
+#include "kilix_game_audio.h"
+#include "kilix_game_runtime.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -36,6 +42,7 @@ static void usage(void)
     (void)puts("                         [--selftest [<seed> [<sim-days>]]]");
     (void)puts("                         [--save-test <dir>]");
     (void)puts("                         [--render-test <seed> <dir>]");
+    (void)puts("                         [--headless [<frames>]]");
     (void)puts("");
     (void)puts("A realtime houseplant you actually have to look after.");
     (void)puts("Runs standalone, or embedded in kilix-land.");
@@ -170,6 +177,199 @@ static int cmd_render_test(int extra, char **args)
     return pg_render_run_test((uint64_t)seed, args[1]);
 }
 
+/* ---- the standalone game ------------------------------------------------
+ *
+ * kilix_game_host_run owns signals, the crash-time tty restore, headless,
+ * max_frames, idle_sleep_ns and the SIGTSTP suspend/resume path. Hand-rolling
+ * the loop would re-implement five things the kit already gets right, and the
+ * clock reset on resume costs nothing because the wall reconciliation below
+ * runs every frame anyway.
+ */
+typedef struct pg_app {
+    pg_state state;
+    pg_graphics graphics;
+    pg_store store;
+    pg_settings settings;
+    pg_input input;
+    ki_td_soft_renderer renderer;
+    pg_render_result result;
+    int64_t last_advance_wall_s;
+    uint64_t tick;
+    bool store_open;
+    bool graphics_open;
+} pg_app;
+
+static bool app_start(kilix_game_host *host, void *user)
+{
+    pg_app *app = (pg_app *)user;
+    char asset_root[1024];
+    char error[256];
+    pg_catchup_report report;
+    bool recovered = false;
+
+    (void)host;
+    pg_init(&app->state, 20260811u);
+
+    if (!kilix_game_data_root_from_executable(
+            "PLEB_PLANT_ASSETS", "assets",
+            "../share/pleb-plant-grower/assets", asset_root,
+            sizeof asset_root)) {
+        asset_root[0] = '\0';
+    }
+    app->graphics_open = pg_graphics_init(&app->graphics, asset_root, error,
+                                          sizeof error);
+    app->store_open = pg_store_open(&app->store, NULL);
+    if (app->store_open) {
+        (void)pg_settings_load(&app->settings, &app->store);
+        (void)pg_store_load(&app->state, &app->store, &recovered);
+    }
+    /* Reconcile at launch exactly as at any other moment: a cold start, a
+     * laptop lid and a midnight rollover all take this same path, so there is
+     * one thing to get right rather than three. */
+    {
+        pg_now now = pg_term_now();
+        (void)pg_advance(&app->state, now, &report);
+        app->last_advance_wall_s = now.wall_s;
+        if (report.entry_count > 0u || report.abandoned) {
+            pg_ui_goto(&app->state.ui, (uint8_t)PG_SCREEN_AWAY);
+        } else {
+            pg_ui_goto(&app->state.ui,
+                       pg_ui_entry_screen(&app->state,
+                                          pg_store_last_status(&app->store)));
+        }
+    }
+    app->input.pointer_x = PG_POINTER_NONE;
+    app->input.pointer_y = PG_POINTER_NONE;
+    return true;
+}
+
+static void app_event(kilix_game_host *host, void *user,
+                      const kittyin_event *event)
+{
+    pg_app *app = (pg_app *)user;
+    kittyts_session *terminal = kilix_game_host_terminal(host);
+
+    pg_term_translate(event, &app->input, &app->result.view,
+                      terminal ? kittyts_origin_x(terminal) : 0,
+                      terminal ? kittyts_origin_y(terminal) : 0);
+}
+
+static bool app_step(kilix_game_host *host, void *user, double step_seconds)
+{
+    pg_app *app = (pg_app *)user;
+
+    (void)host;
+    pg_update(&app->state, &app->input, step_seconds);
+    pg_term_input_reset(&app->input);
+
+    /* Biology is driven by the wall clock, never by frames. Sampling
+     * CLOCK_REALTIME is a vDSO read and effectively free, and advancing only
+     * once a care tick has elapsed keeps the work bounded. */
+    {
+        pg_now now = pg_term_now();
+        if (now.wall_s - app->last_advance_wall_s >= PG_CARE_TICK_SECONDS ||
+            now.wall_s < app->last_advance_wall_s) {
+            pg_catchup_report report;
+            (void)pg_advance(&app->state, now, &report);
+            app->last_advance_wall_s = now.wall_s;
+        }
+    }
+    app->tick += 1u;
+    return true;
+}
+
+static bool app_render(kilix_game_host *host, void *user, double alpha)
+{
+    pg_app *app = (pg_app *)user;
+    kittyts_session *terminal = kilix_game_host_terminal(host);
+    int width = 0;
+    int height = 0;
+    const uint8_t *rgba;
+
+    (void)alpha;
+    if (terminal == NULL) return true;
+    width = kittyts_width(terminal);
+    height = kittyts_height(terminal);
+    if (width <= 0 || height <= 0) return true;
+    if (ki_td_soft_width(&app->renderer) != width ||
+        ki_td_soft_height(&app->renderer) != height) {
+        if (!ki_td_soft_renderer_resize(&app->renderer, width, height) &&
+            !ki_td_soft_renderer_init(&app->renderer, width, height)) {
+            return true;
+        }
+    }
+    /* Nothing here animates yet, so present at ~15 fps rather than 60: the
+     * terminal transport is the expensive part of this game and a still frame
+     * costs the same to send as a moving one. */
+    if ((app->tick & 3u) != 0u) return true;
+    if (!pg_render(&app->renderer, &app->state, &app->graphics,
+                   &app->result)) {
+        return true;
+    }
+    rgba = ki_td_soft_pack_rgba(&app->renderer);
+    if (rgba == NULL) return true;
+    (void)pg_term_present(terminal, rgba, width, height, &app->result);
+    return true;
+}
+
+static void app_stop(kilix_game_host *host, void *user)
+{
+    pg_app *app = (pg_app *)user;
+
+    (void)host;
+    if (app->store_open) {
+        (void)pg_store_save(&app->state, &app->store);
+        (void)pg_settings_save(&app->settings, &app->store);
+        pg_store_close(&app->store);
+    }
+    if (app->graphics_open) {
+        pg_graphics_shutdown(&app->graphics);
+    }
+    ki_td_soft_renderer_destroy(&app->renderer);
+}
+
+static int run_game(bool headless, uint64_t max_frames)
+{
+    static pg_app app;
+    static kilix_game_host host;
+    kilix_game_host_options options;
+    kilix_game_host_callbacks callbacks;
+
+    memset(&app, 0, sizeof app);
+    kilix_game_host_options_init(&options);
+    options.terminal.mouse_tracking = KITTYIN_MOUSE_TRACKING_MOTION;
+    options.terminal.framebuffer.max_width = 1920;   /* 480 x 4 */
+    options.terminal.framebuffer.max_height = 1080;  /* 270 x 4 */
+    /* min_width/min_height are deliberately left at the library defaults --
+     * see pg_term.h. A hard minimum refuses to start where we would rather
+     * degrade. */
+    options.clock.step_ns = KILIX_GAME_NANOSECONDS_PER_SECOND / 60;
+    options.idle_sleep_ns = 2 * 1000 * 1000;
+    options.headless = headless;
+    options.max_frames = max_frames;
+
+    memset(&callbacks, 0, sizeof callbacks);
+    callbacks.start = app_start;
+    callbacks.event = app_event;
+    callbacks.step = app_step;
+    callbacks.render = app_render;
+    callbacks.stop = app_stop;
+
+    return kilix_game_host_run(&host, &options, &callbacks, &app);
+}
+
+static int cmd_headless(int extra, char **args)
+{
+    unsigned long long frames = 120ull;
+
+    if (extra >= 1 && !parse_u64(args[0], UINT32_MAX, &frames)) {
+        (void)fprintf(stderr, "--headless: frames '%s' is not a number\n",
+                      args[0]);
+        return 2;
+    }
+    return run_game(true, (uint64_t)frames);
+}
+
 typedef struct pg_command {
     const char *name;
     int min_extra;
@@ -189,6 +389,7 @@ static const pg_command COMMANDS[] = {
     { "--selftest",      0, 2, " [<seed> [<sim-days>]]",  cmd_selftest },
     { "--save-test",     1, 1, " <dir>",                  cmd_save_test },
     { "--render-test",   2, 2, " <seed> <dir>",           cmd_render_test },
+    { "--headless",      0, 1, " [<frames>]",             cmd_headless },
 };
 
 int main(int argc, char **argv)
@@ -196,8 +397,7 @@ int main(int argc, char **argv)
     size_t index;
 
     if (argc <= 1) {
-        (void)fputs("pleb-plant-grower: no terminal frontend yet\n", stderr);
-        return 0;
+        return run_game(false, 0u);
     }
     for (index = 0; index < sizeof COMMANDS / sizeof COMMANDS[0]; ++index) {
         const pg_command *command = &COMMANDS[index];
