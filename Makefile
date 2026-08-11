@@ -89,7 +89,7 @@ ORIG_SKIP     := --exclude-dir=fixtures
 ORIG_SELF     := ^Makefile:[0-9]+:ORIG_[A-Z_]+ +:=
 
 .PHONY: all test test-cli test-unit test-noalloc test-headless test-render \
-        art-check \
+        art-check test-embed \
         test-content \
         generated-check test-assets test-backgrounds test-art-review test-save \
         embed-guard check-release-tree originality art sfx check-sfx sanitize \
@@ -154,7 +154,7 @@ test-unit: $(PG_LIB) | $(BUILD)/tests
 	@set -e; found=0; \
 	for t in tests/test_*.c; do \
 		[ -e "$$t" ] || continue; \
-		case "$$t" in tests/test_noalloc.c) continue;; esac; \
+		case "$$t" in tests/test_noalloc.c|tests/test_embed.c) continue;; esac; \
 		found=1; \
 		out=$(BUILD)/tests/$$(basename $$t .c); \
 		$(CC) $(CPPFLAGS) $(CFLAGS) $$t $(PG_LIB) $(APP_LIBS) $(LDLIBS) -o $$out; \
@@ -178,6 +178,15 @@ test-headless: $(BIN)
 
 # The no-allocation gate needs the wrap flags, so it cannot ride the generic
 # unit-test loop above.
+# The embed test links the ARCHIVE and the SDK libraries a host already has --
+# and deliberately not main.o or pg_term.o. If the archive ever grew a
+# dependency on the frontend, this is the only gate that would notice, because
+# every other one links the whole binary.
+test-embed: $(PG_LIB) | $(BUILD)/tests
+	@$(CC) $(CPPFLAGS) $(CFLAGS) tests/test_embed.c $(PG_LIB) $(APP_LIBS) \
+		$(LDLIBS) -o $(BUILD)/tests/test-embed
+	@$(BUILD)/tests/test-embed
+
 test-noalloc: $(PG_LIB) | $(BUILD)/tests
 	@$(CC) $(CPPFLAGS) $(CFLAGS) tests/test_noalloc.c $(PG_LIB) $(APP_LIBS) \
 		$(LDLIBS) -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free \
