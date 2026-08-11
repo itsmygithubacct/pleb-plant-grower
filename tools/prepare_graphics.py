@@ -430,6 +430,7 @@ def main(argv: list[str]) -> int:
     if wanted is None and args.check:
         manifest_path = root / "assets/graphics/manifest.json"
         declared = []
+        declared_sheets = []
         if manifest_path.is_file():
             try:
                 entries = json.loads(manifest_path.read_text()).get("entries",
@@ -442,8 +443,11 @@ def main(argv: list[str]) -> int:
                 stem = pathlib.PurePosixPath(str(entry.get("path", ""))).stem
                 if stem in SPECIES and stem not in declared:
                     declared.append(stem)
+                elif stem in SHEETS and stem not in declared_sheets:
+                    declared_sheets.append(stem)
         wanted = declared
-        if not wanted:
+        sheets_wanted = declared_sheets
+        if not wanted and not sheets_wanted:
             print("prepare-graphics: the manifest declares no plant atlases, "
                   "nothing to check")
             return 0
@@ -458,6 +462,18 @@ def main(argv: list[str]) -> int:
         import tempfile
         failures = []
         with tempfile.TemporaryDirectory() as scratch:
+            for sheet in (args.sheet or sheets_wanted if args.check else []):
+                built = out / f"{sheet}.png"
+                if not built.is_file():
+                    failures.append(f"{sheet}: no atlas; run make graphics")
+                    continue
+                _, digest = build_sheet(sheet, source, pathlib.Path(scratch))
+                have = hashlib.sha256(built.read_bytes()).hexdigest()
+                if have != digest:
+                    failures.append(
+                        f"{sheet}: atlas drifted from its master\n"
+                        f"    committed {have[:16]}\n"
+                        f"    rebuilt   {digest[:16]}")
             for species in wanted:
                 built = out / f"{species}.png"
                 if not built.is_file():
@@ -479,8 +495,9 @@ def main(argv: list[str]) -> int:
             for failure in failures:
                 print(f"prepare-graphics: {failure}", file=sys.stderr)
             return 1
-        print(f"prepare-graphics: PASS ({len(wanted)} atlas"
-              f"{'es' if len(wanted) != 1 else ''} match their masters)")
+        total = len(wanted) + len(args.sheet or sheets_wanted)
+        print(f"prepare-graphics: PASS ({total} atlas"
+              f"{'es' if total != 1 else ''} match their masters)")
         return 0
 
     results = {}

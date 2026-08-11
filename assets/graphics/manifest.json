@@ -1,4 +1,175 @@
 {
   "schema_version": 1,
-  "entries": []
+  "_purpose": "The runtime graphics and what each cell means. For the plant atlases growth stage picks the column and health picks the row (ART_BIBLE.md \u00a74.1), which is the order pg_render indexes.",
+  "_derivation": "Every atlas derives from the masters listed beside it by tools/prepare_graphics.py and nothing else. make test-assets rebuilds and compares.",
+  "entries": [
+    {
+      "path": "atlases/pothos.png",
+      "kind": "plant-atlas",
+      "columns": 4,
+      "rows": 6,
+      "cell": 160,
+      "column_labels": [
+        "establishing",
+        "growing",
+        "mature",
+        "specimen"
+      ],
+      "row_labels": [
+        "thriving",
+        "healthy",
+        "thirsty",
+        "distressed",
+        "critical",
+        "dead"
+      ],
+      "alpha_required": true,
+      "sha256": "c0dfb9c92f7cb3f0227ae79359c4d863d28d15c4dfdf056a9a4e48733b74ef87",
+      "masters": [
+        "source/pothos-thriving-chroma.png",
+        "source/pothos-healthy-chroma.png",
+        "source/pothos-thirsty-chroma.png",
+        "source/pothos-distressed-chroma.png",
+        "source/pothos-critical-chroma.png",
+        "source/pothos-dead-chroma.png"
+      ]
+    },
+    {
+      "path": "atlases/snake-plant.png",
+      "kind": "plant-atlas",
+      "columns": 4,
+      "rows": 6,
+      "cell": 160,
+      "column_labels": [
+        "establishing",
+        "growing",
+        "mature",
+        "specimen"
+      ],
+      "row_labels": [
+        "thriving",
+        "healthy",
+        "thirsty",
+        "distressed",
+        "critical",
+        "dead"
+      ],
+      "alpha_required": true,
+      "sha256": "707eb80ba9430d596c97d506a86353b8582d7fd70b2985c4f3947405f3c97005",
+      "masters": [
+        "source/snake-plant-thriving-chroma.png",
+        "source/snake-plant-healthy-chroma.png",
+        "source/snake-plant-thirsty-chroma.png",
+        "source/snake-plant-distressed-chroma.png",
+        "source/snake-plant-critical-chroma.png",
+        "source/snake-plant-dead-chroma.png"
+      ]
+    },
+    {
+      "path": "atlases/peace-lily.png",
+      "kind": "plant-atlas",
+      "columns": 4,
+      "rows": 6,
+      "cell": 160,
+      "column_labels": [
+        "establishing",
+        "growing",
+        "mature",
+        "specimen"
+      ],
+      "row_labels": [
+        "thriving",
+        "healthy",
+        "thirsty",
+        "distressed",
+        "critical",
+        "dead"
+      ],
+      "alpha_required": true,
+      "sha256": "a7a45eea42b7dfb7356c328e4c5db14b616c4b64568fbc8d3f1d46ed57e7b9ac",
+      "masters": [
+        "source/peace-lily-thriving-chroma.png",
+        "source/peace-lily-healthy-chroma.png",
+        "source/peace-lily-thirsty-chroma.png",
+        "source/peace-lily-distressed-chroma.png",
+        "source/peace-lily-critical-chroma.png",
+        "source/peace-lily-dead-chroma.png"
+      ]
+    },
+    {
+      "path": "atlases/calathea.png",
+      "kind": "plant-atlas",
+      "columns": 4,
+      "rows": 6,
+      "cell": 160,
+      "column_labels": [
+        "establishing",
+        "growing",
+        "mature",
+        "specimen"
+      ],
+      "row_labels": [
+        "thriving",
+        "healthy",
+        "thirsty",
+        "distressed",
+        "critical",
+        "dead"
+      ],
+      "alpha_required": true,
+      "sha256": "e34c14c6088cea948e43dd37efe6f3b1a131952153d3d8f435102dc66429f36f",
+      "masters": [
+        "source/calathea-thriving-chroma.png",
+        "source/calathea-healthy-chroma.png",
+        "source/calathea-thirsty-chroma.png",
+        "source/calathea-distressed-chroma.png",
+        "source/calathea-critical-chroma.png",
+        "source/calathea-dead-chroma.png"
+      ]
+    },
+    {
+      "path": "atlases/pots.png",
+      "kind": "sheet-atlas",
+      "columns": 4,
+      "rows": 4,
+      "cell_width": 176,
+      "cell_height": 96,
+      "alpha_required": true,
+      "sha256": "9c64c10d2e93487394aed1f722f87a8bdfdb7726624a61714f096d481ed5a7e0",
+      "masters": [
+        "source/pots-chroma.png"
+      ]
+    },
+    {
+      "path": "atlases/tools.png",
+      "kind": "sheet-atlas",
+      "columns": 4,
+      "rows": 4,
+      "cell_width": 64,
+      "cell_height": 64,
+      "alpha_required": true,
+      "sha256": "7681849860809a0667850e6aebb1ef523516a39dda9330d21aa6c10ce9b4bba9",
+      "masters": [
+        "source/tools-chroma.png"
+      ]
+    },
+    {
+      "path": "atlases/decals.png",
+      "kind": "sheet-atlas",
+      "columns": 4,
+      "rows": 4,
+      "cell_width": 64,
+      "cell_height": 64,
+      "alpha_required": true,
+      "sha256": "0e8589bc9046fdec7972a1ab19a67e4ccb86551a5f00c6ce51cabe0a6113a602",
+      "masters": [
+        "source/decals-chroma.png"
+      ]
+    },
+    {
+      "path": "bitmaps/title.png",
+      "kind": "bitmap",
+      "sha256": "81b5fcf41f44bdb277eac0d435037343a1f15095978cb2603159e16e2d85f864"
+    }
+  ]
 }

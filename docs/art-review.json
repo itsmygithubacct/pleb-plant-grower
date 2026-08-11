@@ -1,4 +1,62 @@
 {
   "schema_version": 1,
-  "entries": []
+  "_purpose": "The owner's verdict on generated art. make test-art-review requires an entry per manifest item whose sha256 matches the committed file and whose verdict is 'accept'.",
+  "entries": [
+    {
+      "path": "atlases/pothos.png",
+      "sha256": "c0dfb9c92f7cb3f0227ae79359c4d863d28d15c4dfdf056a9a4e48733b74ef87",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/snake-plant.png",
+      "sha256": "707eb80ba9430d596c97d506a86353b8582d7fd70b2985c4f3947405f3c97005",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/peace-lily.png",
+      "sha256": "a7a45eea42b7dfb7356c328e4c5db14b616c4b64568fbc8d3f1d46ed57e7b9ac",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/calathea.png",
+      "sha256": "e34c14c6088cea948e43dd37efe6f3b1a131952153d3d8f435102dc66429f36f",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/pots.png",
+      "sha256": "9c64c10d2e93487394aed1f722f87a8bdfdb7726624a61714f096d481ed5a7e0",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/tools.png",
+      "sha256": "7681849860809a0667850e6aebb1ef523516a39dda9330d21aa6c10ce9b4bba9",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/decals.png",
+      "sha256": "0e8589bc9046fdec7972a1ab19a67e4ccb86551a5f00c6ce51cabe0a6113a602",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "bitmaps/title.png",
+      "sha256": "81b5fcf41f44bdb277eac0d435037343a1f15095978cb2603159e16e2d85f864",
+      "verdict": "accept",
+      "reviewed": "2026-08-11",
+      "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    }
+  ]
 }

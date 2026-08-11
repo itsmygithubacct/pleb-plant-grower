@@ -53,7 +53,16 @@ def main() -> int:
         if record.get("verdict") != "accept":
             failures.append(f"{rel}: verdict is {record.get('verdict')!r}")
             continue
-        blob = ROOT / rel
+        # Manifest paths are relative to the MANIFEST, not to the repository
+        # root: the manifest lives at assets/graphics/ and says
+        # "atlases/pothos.png". Resolving from the root looked for
+        # <repo>/atlases/pothos.png and reported every single entry missing.
+        #
+        # This gate had never run against a non-empty manifest -- it passes
+        # trivially on an empty one by design -- so the defect sat here from
+        # Milestone 0 until the first real art landed. It failed safe, which is
+        # the right direction for a gate to be wrong in.
+        blob = MANIFEST.parent / rel
         if not blob.exists():
             failures.append(f"{rel}: named in the manifest but not on disk")
             continue
