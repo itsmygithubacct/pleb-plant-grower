@@ -176,6 +176,16 @@ bool pg_store_save_failed(const pg_store *store);
  * the failed one, so the readable one survives for a post-mortem. */
 uint8_t pg_store_generation(const pg_store *store);
 
+/* Test seam. Makes the next `count` writes report KILIXSTATE_IO_ERROR, which
+ * is the disk-full / read-only-home path. Consumed by the writes that trip it.
+ *
+ * It exists because that path cannot be provoked from outside the process: the
+ * store writes through descriptors it already holds, so revoking directory
+ * permission after open has no effect. It can only ever produce a failure the
+ * code already handles, and it is the same one-counter shape as
+ * pg_sim_poison_after. */
+void pg_store_fail_next_writes(uint32_t count);
+
 /* Headless diagnostic behind `--save-test <dir>`: the round trip, then the
  * ported corruption harness — every single-bit flip across the record,
  * deterministic multi-bit flips, every truncation length, length-field

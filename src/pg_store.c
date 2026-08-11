@@ -56,6 +56,35 @@ static const char *const PG_STORE_PLANT_FILES[2] = {
     "plant-a.state", "plant-b.state"
 };
 
+/* ---- the write-failure seam ---------------------------------------------
+ *
+ * A full disk and a read-only home are failure paths a player really hits, and
+ * PG_STORE_IO_ERROR is the whole of the game's answer to them: a sticky banner
+ * and a plant you can keep watering. Neither can be provoked from outside the
+ * process -- the store writes through descriptors it already holds, so making
+ * the directory read-only after open does not bite, and filling the disk is
+ * not a test. Without a seam the branch is unreachable and therefore untested,
+ * which is how a fail-soft path quietly becomes a crash.
+ *
+ * Same shape and same justification as pg_sim_poison_after: one file-scope
+ * counter, consumed by the write that trips it, and it can only ever cause the
+ * failure the code already handles. */
+static uint32_t pg_store_forced_failures = 0u;
+
+void pg_store_fail_next_writes(uint32_t count)
+{
+    pg_store_forced_failures = count;
+}
+
+static bool pg_store_take_forced_failure(void)
+{
+    if (pg_store_forced_failures == 0u) {
+        return false;
+    }
+    pg_store_forced_failures -= 1u;
+    return true;
+}
+
 /* ---- lifecycle ---------------------------------------------------------- */
 
 static uint8_t store_status_for(kilixstate_result result)
@@ -370,7 +399,9 @@ bool pg_store_save(const pg_state *state, pg_store *store)
         store->save_failed = true;
         return false;
     }
-    result = kilixstate_save(&store->plant[target], store->scratch, written);
+    result = pg_store_take_forced_failure()
+           ? KILIXSTATE_IO_ERROR
+           : kilixstate_save(&store->plant[target], store->scratch, written);
     if (result != KILIXSTATE_OK) {
         store->status = store_status_for(result);
         if (store->status == (uint8_t)PG_STORE_FIRST_RUN
@@ -1184,6 +1215,90 @@ static bool durable_sweeps(const char *directory, const pg_state *expected,
         if (pg_store_save(expected, &store)
             || pg_store_last_status(&store) != (uint8_t)PG_STORE_CONFLICT) {
             (void)test_fail(report, "a second window was not detected", 0u);
+            goto cleanup;
+        }
+    }
+
+    /* A full disk, or a home that will not take ink. The save must not land,
+     * the banner must be sticky, BOTH records on disk must be untouched, and
+     * the next good save must land and clear the banner — the plant is still
+     * there to be watered, which is the whole promise of the fail-soft path.
+     * Driven through the write seam because neither real condition can be
+     * reached from outside the process (pg_save.h). */
+    pg_store_close(&store);
+    if (!pg_store_open(&store, directory)) {
+        (void)test_fail(report, "the store would not reopen", 0u);
+        goto cleanup;
+    }
+    if (kilixstate_remove(&store.plant[0]) != KILIXSTATE_OK
+        || kilixstate_remove(&store.plant[1]) != KILIXSTATE_OK
+        || !pg_store_save(expected, &store)) {
+        (void)test_fail(report, "the io-error fixture could not be built", 0u);
+        goto cleanup;
+    }
+    {
+        uint8_t before[2][PG_SAVE_MAX_PAYLOAD + PG_TEST_RECORD_HEADER_BYTES];
+        uint8_t after[PG_SAVE_MAX_PAYLOAD + PG_TEST_RECORD_HEADER_BYTES];
+        char record_path[2][KILIXSTATE_PATH_CAPACITY];
+        size_t before_size[2] = { 0u, 0u };
+        size_t after_size = 0u;
+        bool present[2];
+        size_t generation;
+
+        for (generation = 0u; generation < 2u; ++generation) {
+            if (kilixstate_store_path(&store.plant[generation],
+                                      record_path[generation],
+                                      sizeof record_path[generation])
+                != KILIXSTATE_OK) {
+                (void)test_fail(report, "a store path is unavailable",
+                                generation);
+                goto cleanup;
+            }
+            present[generation] = read_file(record_path[generation],
+                                            before[generation],
+                                            sizeof before[generation],
+                                            &before_size[generation]);
+        }
+
+        pg_store_fail_next_writes(1u);
+        if (pg_store_save(expected, &store)) {
+            pg_store_fail_next_writes(0u);
+            (void)test_fail(report, "a write that failed reported success",
+                            0u);
+            goto cleanup;
+        }
+        if (pg_store_last_status(&store) != (uint8_t)PG_STORE_IO_ERROR) {
+            (void)test_fail(report,
+                            "a failed write was not reported as an io error",
+                            0u);
+            goto cleanup;
+        }
+        if (!pg_store_save_failed(&store)) {
+            (void)test_fail(report, "the failed-save banner is not sticky",
+                            0u);
+            goto cleanup;
+        }
+        for (generation = 0u; generation < 2u; ++generation) {
+            bool now_present = read_file(record_path[generation], after,
+                                         sizeof after, &after_size);
+            if (now_present != present[generation]
+                || (now_present
+                    && (after_size != before_size[generation]
+                        || memcmp(after, before[generation],
+                                  after_size) != 0))) {
+                (void)test_fail(report,
+                                "a failed write changed the record on disk",
+                                generation);
+                goto cleanup;
+            }
+        }
+
+        /* And the game carries on: the next write lands and the banner goes. */
+        if (!pg_store_save(expected, &store)
+            || pg_store_last_status(&store) != (uint8_t)PG_STORE_READY
+            || pg_store_save_failed(&store)) {
+            (void)test_fail(report,
+                            "the save after an io error did not recover", 0u);
             goto cleanup;
         }
     }
