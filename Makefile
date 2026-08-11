@@ -89,7 +89,7 @@ ORIG_SKIP     := --exclude-dir=fixtures
 ORIG_SELF     := ^Makefile:[0-9]+:ORIG_[A-Z_]+ +:=
 
 .PHONY: all test test-cli test-unit test-noalloc test-headless test-render \
-        art-check test-embed \
+        art-check art-recipes-check test-embed \
         test-content \
         generated-check test-assets test-backgrounds test-art-review test-save \
         embed-guard check-release-tree originality art sfx check-sfx sanitize \
@@ -260,6 +260,14 @@ originality:
 
 art:
 	$(PYTHON) tools/gen_art.py
+
+# The prompt ledger is expanded from ART_BIBLE.md, never hand-written, so it
+# cannot drift from the document that governs it.
+art-recipes:
+	@$(PYTHON) tools/art_recipes.py
+
+art-recipes-check:
+	@$(PYTHON) tools/art_recipes.py --check
 
 art-check:
 	@$(PYTHON) tools/gen_art.py --check
