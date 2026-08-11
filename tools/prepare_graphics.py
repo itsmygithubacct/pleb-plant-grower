@@ -364,7 +364,35 @@ def main(argv: list[str]) -> int:
     root = pathlib.Path(__file__).resolve().parent.parent
     source = (root / args.source).resolve()
     out = (root / args.out).resolve()
-    wanted = args.species or list(SPECIES)
+
+    # --check verifies what the MANIFEST declares, not a hard-coded list.
+    # It did the latter, which meant `make test-assets` announced that it was
+    # validating the manifest while never opening it: a manifest could name
+    # one atlas, or twelve, or none of the four, and the check would demand
+    # exactly the same four either way.
+    wanted = args.species
+    if wanted is None and args.check:
+        manifest_path = root / "assets/graphics/manifest.json"
+        declared = []
+        if manifest_path.is_file():
+            try:
+                entries = json.loads(manifest_path.read_text()).get("entries",
+                                                                    [])
+            except json.JSONDecodeError as error:
+                print(f"prepare-graphics: manifest is not valid JSON: {error}",
+                      file=sys.stderr)
+                return 1
+            for entry in entries:
+                stem = pathlib.PurePosixPath(str(entry.get("path", ""))).stem
+                if stem in SPECIES and stem not in declared:
+                    declared.append(stem)
+        wanted = declared
+        if not wanted:
+            print("prepare-graphics: the manifest declares no plant atlases, "
+                  "nothing to check")
+            return 0
+    if wanted is None:
+        wanted = list(SPECIES)
 
     # --check was accepted and ignored, so it rebuilt the atlases and reported
     # success -- a check that performs the action it is meant to verify, and
