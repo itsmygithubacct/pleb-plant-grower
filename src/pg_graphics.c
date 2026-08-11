@@ -138,6 +138,62 @@ static uint8_t scene_index_for(const pg_graphics *graphics, const char *id)
     return PG_SCENE_NONE;
 }
 
+/* The atlas file names are the species ids of content/plants.json, which is
+ * also what ART_BIBLE names them. One lookup table rather than a switch, so
+ * adding a fifth species is a content change and not a code change. */
+static const char *const PG_ATLAS_FILES[PG_SPECIES_COUNT] = {
+    "pothos", "snake-plant", "peace-lily", "calathea"
+};
+
+#define PG_ATLAS_COLUMNS 4u
+#define PG_ATLAS_ROWS 6u
+#define PG_ATLAS_CELL 160u
+
+/* Load whatever plant atlases exist. A missing one leaves that species on the
+ * procedural path and is not reported as a failure: the game must open with
+ * no art at all, which is the whole reason the procedural plant exists. */
+static void load_plant_atlases(pg_graphics *graphics)
+{
+    size_t index;
+
+    graphics->plant_atlas_count = 0u;
+    for (index = 0u; index < (size_t)PG_SPECIES_COUNT; ++index) {
+        char relative[128];
+        char resolved[512];
+        kilix_asset_image *image = &graphics->plant_atlas[index];
+        int written = snprintf(relative, sizeof relative,
+                               "graphics/atlases/%s.png",
+                               PG_ATLAS_FILES[index]);
+
+        graphics->plant_atlas_valid[index] = false;
+        kilix_asset_image_clear(image);
+        if (written <= 0 || (size_t)written >= sizeof relative ||
+            !kilix_asset_path_is_safe(relative)) {
+            continue;
+        }
+        if (kilix_asset_resolve(&graphics->locator, relative, resolved,
+                                sizeof resolved) != KILIX_ASSET_OK) {
+            continue;
+        }
+        if (kilix_asset_image_load_png(image, resolved, &graphics->limits)
+            != KILIX_ASSET_OK) {
+            continue;
+        }
+        /* Exact size or nothing, like the backdrop plates: a mis-sized atlas
+         * would slice cells at the wrong offsets and produce sprites made of
+         * two half-plants, which is far worse than no sprite. */
+        if (image->width != PG_ATLAS_COLUMNS * PG_ATLAS_CELL ||
+            image->height != PG_ATLAS_ROWS * PG_ATLAS_CELL ||
+            !kilix_asset_atlas_init_grid(&graphics->plant_grid[index], image,
+                                         PG_ATLAS_COLUMNS, PG_ATLAS_ROWS)) {
+            kilix_asset_image_clear(image);
+            continue;
+        }
+        graphics->plant_atlas_valid[index] = true;
+        graphics->plant_atlas_count += 1u;
+    }
+}
+
 bool pg_graphics_init(pg_graphics *graphics, const char *asset_root,
                       char *error, size_t error_size)
 {
@@ -198,6 +254,8 @@ bool pg_graphics_init(pg_graphics *graphics, const char *asset_root,
         }
     }
 
+    load_plant_atlases(graphics);
+
     graphics->scene = PG_SCENE_NONE;
     graphics->full_frame_pending = true;
     return true;
@@ -207,6 +265,14 @@ void pg_graphics_shutdown(pg_graphics *graphics)
 {
     if (graphics == NULL) {
         return;
+    }
+    {
+        size_t index;
+        for (index = 0u; index < (size_t)PG_SPECIES_COUNT; ++index) {
+            kilix_asset_image_clear(&graphics->plant_atlas[index]);
+            graphics->plant_atlas_valid[index] = false;
+        }
+        graphics->plant_atlas_count = 0u;
     }
     release_plates(graphics);
     graphics->scene = PG_SCENE_NONE;

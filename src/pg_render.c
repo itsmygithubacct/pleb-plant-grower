@@ -267,6 +267,80 @@ static void draw_plant_body(ki_td_soft_renderer *renderer,
     (void)state;
 }
 
+/* Layer 2, the authored path. Returns false when this species has no atlas,
+ * which is how the caller knows to draw the procedural plant instead. */
+static bool draw_plant_atlas(ki_td_soft_renderer *renderer,
+                             const ki_td_view *view,
+                             const pg_graphics *graphics,
+                             const pg_plant *plant, uint32_t light)
+{
+    kilix_asset_region cell;
+    ki_td_rgba8 sprite;
+    uint8_t health;
+    uint8_t stage;
+    float droop;
+    float x;
+    float y;
+
+    if (graphics == NULL || plant->species_id >= (uint8_t)PG_SPECIES_COUNT ||
+        !graphics->plant_atlas_valid[plant->species_id]) {
+        return false;
+    }
+    stage = plant->growth_stage < (uint8_t)PG_STAGE_COUNT
+          ? plant->growth_stage : (uint8_t)(PG_STAGE_COUNT - 1);
+    health = pg_plant_health(plant);
+    if (health >= (uint8_t)PG_HEALTH_COUNT) {
+        health = (uint8_t)PG_HEALTH_COUNT - 1u;
+    }
+    cell = kilix_asset_atlas_cell(&graphics->plant_grid[plant->species_id],
+                                  stage, health);
+    if (!kilix_asset_region_is_valid(&cell)) {
+        return false;
+    }
+    sprite = ki_td_rgba8_make(cell.pixels, (int)cell.width, (int)cell.height);
+    sprite.stride = cell.stride;      /* a region is a window, not a copy */
+
+    /* Posture, channel 4: the same droop the procedural plant uses, so the
+     * two paths agree about what a limp plant looks like. */
+    droop = droop_offset(plant);
+    x = (float)PG_POT_CX - (float)cell.width * 0.5f;
+    y = (float)PG_POT_RIM_Y + droop - (float)cell.height + 8.0f;
+
+    /* Tinted rather than plain: channel 2 interpolates between the authored
+     * rows and is what makes the transition between two health states a fade
+     * rather than a jump. */
+    ki_td_soft_rgba_tinted(renderer, view, x, y, &sprite, (int)cell.width,
+                           (int)cell.height,
+                           sr_mix(light, health_tint(health), 0.25f), 1.0f);
+    return true;
+}
+
+/* Layer 3 for the authored path: the decals still composite at the leaf
+ * anchors, because permanence (D-030) reaches the screen only through them and
+ * an atlas cell cannot carry a per-leaf damage history. */
+static void draw_plant_decals(ki_td_soft_renderer *renderer,
+                              const ki_td_view *view, const pg_plant *plant,
+                              const pg_care_env *env)
+{
+    size_t index;
+    uint16_t fold = pg_plant_fold_l(plant, env->ordinal, env->local_minutes);
+    float droop = droop_offset(plant);
+
+    for (index = 0u; index < plant->leaf_count && index < PG_LEAF_MAX;
+         ++index) {
+        uint8_t mask = plant->leaves[index].damage_mask;
+        float angle;
+        float reach;
+
+        if (mask == 0u) continue;
+        angle = -1.15f + 0.42f * (float)index;
+        reach = 18.0f + 3.0f * (float)(index % 4u);
+        draw_leaf(renderer, view, (float)PG_POT_CX + sinf(angle) * reach,
+                  (float)PG_POT_RIM_Y + droop - cosf(angle) * reach * 0.72f,
+                  0.5f, 0.5f, UINT32_C(0x000000), mask, fold);
+    }
+}
+
 /* ---- layer 4: the pot, in front ------------------------------------------ */
 static void draw_pot(ki_td_soft_renderer *renderer, const ki_td_view *view,
                      const pg_plant *plant)
@@ -451,8 +525,21 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
         const pg_plant *plant = &state->plants[plant_index];
         pg_care_env env = pg_sim_env_now(state, (uint8_t)plant_index);
 
-        /* Layers 2 and 3. */
-        draw_plant_body(renderer, &view, state, plant, &env, light);
+        /* Layer 2. Authored art when the species has an atlas, the procedural
+         * plant when it does not -- the same "missing is not an error" rule
+         * the backdrops follow, and the reason art latency was never on the
+         * critical path.
+         *
+         * Channel 1 of ARCHITECTURE.md §3.3: growth stage picks the COLUMN,
+         * health picks the ROW. The colour ramp (channel 2) still tints,
+         * because it interpolates between the six authored rows rather than
+         * replacing them, and the decals and posture channels still apply on
+         * top -- an atlas cell is the silhouette, not the whole readout. */
+        if (!draw_plant_atlas(renderer, &view, graphics, plant, light)) {
+            draw_plant_body(renderer, &view, state, plant, &env, light);
+        } else {
+            draw_plant_decals(renderer, &view, plant, &env);
+        }
         /* Layer 4 -- in front of the stems, deliberately. */
         draw_pot(renderer, &view, plant);
         /* Layer 5. */

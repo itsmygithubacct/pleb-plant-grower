@@ -103,8 +103,23 @@ $(BUILD) $(BUILD)/obj $(BUILD)/tests:
 $(VENDOR_OBJ): $(CHIP_SEQUENCER_DIR)/src/chip_sequencer.c | $(BUILD)/obj
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
+# Automatic header dependencies. Without these, editing a header that defines
+# an aggregate rebuilt only SOME of the objects that embed it, and the result
+# was a segfault in free(): pg_graphics grew a field, pg_graphics.o memset the
+# new larger size over a static declared with the old smaller one in a stale
+# translation unit, and the write ran off the end into the next static.
+#
+# That is precisely the hazard docs/EMBEDDING.md warns a host about -- two
+# translation units disagreeing about a struct, failing silently rather than at
+# link time -- happening inside this build. The hand-written per-object rules
+# below cover the SDK headers; these cover ours, which is the half that was
+# missing.
+DEPFLAGS = -MMD -MP
+
 $(BUILD)/obj/%.o: src/%.c | $(BUILD)/obj
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(GAME_CFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(GAME_CFLAGS) $(DEPFLAGS) -c $< -o $@
+
+-include $(wildcard $(BUILD)/obj/*.d)
 
 # content/*.json is the authored source; the header is a build product and is
 # regenerated whenever the JSON moves, so it can never be stale in the tree.

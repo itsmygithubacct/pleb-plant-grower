@@ -216,6 +216,19 @@ struct pg_graphics {
     kilix_asset_image plate;        /* the current scene's backdrop */
     kilix_asset_image front;        /* its optional RGBA occluder */
     bool plate_valid, front_valid;
+
+    /* One atlas per species: 4 growth columns x 6 health rows of 160 px
+     * cells. Growth stage picks the column, health picks the row
+     * (ARCHITECTURE.md §3.3), which is the coarse silhouette channel the
+     * colour ramp then interpolates between.
+     *
+     * Absent atlases are not an error: the renderer draws the procedural
+     * plant instead, which is what keeps the build playable while art is
+     * outstanding and is why art latency was never on the critical path. */
+    kilix_asset_image plant_atlas[PG_SPECIES_COUNT];
+    kilix_asset_atlas plant_grid[PG_SPECIES_COUNT];
+    bool plant_atlas_valid[PG_SPECIES_COUNT];
+    uint8_t plant_atlas_count;
 };
 
 /* The event ring. Writing is append-only and wraps; reading hands back the
