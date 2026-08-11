@@ -1,5 +1,81 @@
 {
   "schema_version": 1,
-  "next_id": 1,
-  "assigned": []
+  "_purpose": "The append-only record of every stable id compiled into saved state (D-044, D-081). A number here is never moved or reused: a save written by any build must mean the same plant in every later one. New content takes next_id for its kind and increments it.",
+  "next_id": {
+    "species": 4,
+    "pot": 4,
+    "spot": 6
+  },
+  "assigned": [
+    {
+      "kind": "species",
+      "id": "golden-pothos",
+      "numeric_id": 0
+    },
+    {
+      "kind": "species",
+      "id": "snake-plant-laurentii",
+      "numeric_id": 1
+    },
+    {
+      "kind": "species",
+      "id": "peace-lily",
+      "numeric_id": 2
+    },
+    {
+      "kind": "species",
+      "id": "calathea",
+      "numeric_id": 3
+    },
+    {
+      "kind": "pot",
+      "id": "terracotta",
+      "numeric_id": 0
+    },
+    {
+      "kind": "pot",
+      "id": "glazed",
+      "numeric_id": 1
+    },
+    {
+      "kind": "pot",
+      "id": "nursery",
+      "numeric_id": 2
+    },
+    {
+      "kind": "pot",
+      "id": "cachepot",
+      "numeric_id": 3
+    },
+    {
+      "kind": "spot",
+      "id": "sill-south",
+      "numeric_id": 0
+    },
+    {
+      "kind": "spot",
+      "id": "one-metre",
+      "numeric_id": 1
+    },
+    {
+      "kind": "spot",
+      "id": "two-metre",
+      "numeric_id": 2
+    },
+    {
+      "kind": "spot",
+      "id": "north-shelf",
+      "numeric_id": 3
+    },
+    {
+      "kind": "spot",
+      "id": "radiator-shelf",
+      "numeric_id": 4
+    },
+    {
+      "kind": "spot",
+      "id": "bath-shelf",
+      "numeric_id": 5
+    }
+  ]
 }

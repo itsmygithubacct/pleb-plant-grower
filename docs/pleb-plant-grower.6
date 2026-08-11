@@ -17,12 +17,52 @@ Print the version and exit.
 .TP
 .B \-\-help
 Print usage and exit.
+.PP
+The remaining options are headless diagnostics. Each prints a deterministic
+report and exits non-zero on the first failed assertion, so all of them are
+usable as gates.
+.TP
+.B \-\-calendar\-test
+Date arithmetic, the season window and the local-hour rules. The output is
+independent of the host time zone; two runs under different
+.B TZ
+values compare byte-identical.
+.TP
+.B \-\-time\-test
+The gap matrix: every clock the reconciliation policy survives, including a
+backwards wall clock, a reboot, a forged boot id and an
+.BR INT64_MIN \-> INT64_MAX
+transition.
+.TP
+.B \-\-care\-test
+The care model: derived watering intervals, the symptom ladders and the
+cachepot's soggy ticks.
+.TP
+.B \-\-rules\-test
+Verb legality, the four hard refusals and the myth blocklist.
+.TP
+.BI \-\-selftest " [seed [sim-days]]"
+The catch-up engine: the same gap simulated in 15-minute ticks, in one step and
+in ragged chunks must agree, and no gap may cost more than 30 days of work.
+The output is a pure function of the two arguments, so two runs compare equal.
+Defaults to seed 1337 and 400 days. A non-numeric argument is an error.
+.TP
+.BI \-\-save\-test " dir"
+Persistence: the record round trips, then every single-bit flip, truncation and
+semantic case is either refused or decodes to a record that re-encodes to
+itself \(em and neither outcome ever changes the plant it was handed.
+.I dir
+must be an absolute path; it is written into and then emptied.
 .SH EXIT STATUS
 .TP
 .B 0
-Success.
+Success, or every assertion in a diagnostic held.
+.TP
+.B 1
+A diagnostic reported a failed assertion.
 .TP
 .B 2
-Unrecognised option.
+Unrecognised option, wrong number of arguments, or an unparsable numeric
+argument.
 .SH SEE ALSO
 .BR kilix-land (6)

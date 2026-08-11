@@ -181,10 +181,19 @@ generated-check: $(GENERATED_HEADER)
 	test $$rc -eq 0 || { echo "generated-check: header does not match content/" >&2; exit 1; }
 	@echo "generated-check: PASS"
 
+# Three outcomes, deliberately. An empty manifest is the pre-art state and
+# passes; a populated manifest with no pipeline to check it is a FAILURE, not a
+# skip -- that combination means art shipped without validation, which is the
+# one case a silent "nothing to validate" must never cover.
 test-assets:
-	@if [ -s assets/graphics/manifest.json ]; then \
+	@if ! $(PYTHON) -c 'import json,sys; sys.exit(0 if json.load(open("assets/graphics/manifest.json")).get("entries") else 1)' 2>/dev/null; then \
+		echo "test-assets: manifest has no entries yet, nothing to validate"; \
+	elif [ -f tools/prepare_graphics.py ]; then \
 		PYTHONPATH=$(KILIX_GAME_TOOLS_PYTHONPATH) $(PYTHON) tools/prepare_graphics.py --check; \
-	else echo "test-assets: empty manifest, nothing to validate"; fi
+	else \
+		echo "test-assets: manifest lists entries but tools/prepare_graphics.py is missing -- art cannot ship unvalidated" >&2; \
+		exit 1; \
+	fi
 
 test-backgrounds:
 	@if [ -x tools/validate_backgrounds.py ]; then \
@@ -198,7 +207,10 @@ test-save: $(BIN)
 	@dir=$$(mktemp -d); ./$(BIN) --save-test $$dir; rc=$$?; rm -rf $$dir; \
 	test $$rc -eq 0 && echo "test-save: PASS"
 
+# The guard checks itself before it checks the archive: a classifier that has
+# stopped catching clock and host symbols would otherwise print PASS forever.
 embed-guard: $(PG_LIB)
+	@$(PYTHON) tests/check_embed_guard.py --selftest
 	@$(PYTHON) tests/check_embed_guard.py $(NM) $(PG_LIB)
 
 check-release-tree:
@@ -221,10 +233,22 @@ sfx:
 check-sfx:
 	$(PYTHON) tools/gen_sfx.py --check --out assets/sfx --manifest docs/audio-provenance.json
 
+# -fno-sanitize-recover is load-bearing: without it UBSan PRINTS the diagnostic
+# and carries on, the target exits 0, and the gate reports success over a live
+# signed-overflow. That is the exact defect class ARCHITECTURE.md §8.3 makes
+# this a gate for -- pg_time's saturating arithmetic exists because a legal
+# INT64_MIN -> INT64_MAX wall transition overflows plain subtraction.
+# ASAN_OPTIONS/UBSAN_OPTIONS are belt and braces for the same reason.
+SANITIZE_CFLAGS := -O1 -g -fsanitize=address,undefined \
+                   -fno-sanitize-recover=all -fno-omit-frame-pointer
+SANITIZE_LDFLAGS := -fsanitize=address,undefined -fno-sanitize-recover=all
+
 sanitize:
 	$(MAKE) clean
-	$(MAKE) CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" \
-	        LDFLAGS="-fsanitize=address,undefined" test-cli test-headless
+	ASAN_OPTIONS=abort_on_error=1:halt_on_error=1:detect_leaks=1 \
+	UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+	$(MAKE) CFLAGS="$(SANITIZE_CFLAGS)" LDFLAGS="$(SANITIZE_LDFLAGS)" \
+	        test-cli test-headless test-unit test-save
 
 test-clang:
 	$(MAKE) clean

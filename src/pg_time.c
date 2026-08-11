@@ -227,7 +227,26 @@ static const pg_time_case pg_time_cases[] = {
     { "boot-clock-rewound",       true,  INT64_C(1000000), 1000,    1u,   0,    INT64_C(1003600),    950,           1u,   0,     3600,              3600,             false, false, false, false, false },
     { "relaunch-same-instant",    true,  INT64_C(1000000), 1000,    1u,   0,    INT64_C(1000000),    1000,          1u,   0,     0,                 0,                false, false, false, false, false },
     { "int64-min-to-int64-max",   true,  INT64_MIN,        INT64_MIN, 1u, 0,    INT64_MAX,           INT64_MAX,     1u,   0,     INT64_MAX,         PG_GAP_CREDIT_MAX_SECONDS, true, false, false, false, false },
-    { "corrupt-tz-becomes-zero",  true,  INT64_C(1000000), 1000,    1u,   0,    INT64_C(1003600),    4600,          1u,   99999, 3600,              3600,             false, false, false, false, false }
+    { "corrupt-tz-becomes-zero",  true,  INT64_C(1000000), 1000,    1u,   0,    INT64_C(1003600),    4600,          1u,   99999, 3600,              3600,             false, false, false, false, false },
+
+    /* D-095, the two places the shipped policy corrects ARCHITECTURE.md
+     * §5.3's first draft. Both use boot tag 0, i.e. an all-zero boot id at
+     * BOTH ends -- a host where the kernel boot id is unavailable, so
+     * `same_boot` is true across a genuine reboot and the boot clock appears
+     * to have rewound. Named rather than merely covered, so the intent is
+     * executable and a future reader cannot "simplify" the guard away. */
+
+    /* (a) The draft took min(gap_wall, gap_boot) whenever the ids matched, so
+     * with gap_boot = -89700 it credited ZERO for a real two-day absence --
+     * on every reboot of such a host. Requiring gap_boot >= 0 falls back to
+     * the wall gap, which is what a detected reboot already gets. */
+    { "d095-zeroed-bootid-reboot", true, INT64_C(1000000), 90000,   0u,   0,    INT64_C(1172800),    300,           0u,   0,     172800,            172800,           false, false, false, false, false },
+
+    /* (b) `abandoned` is `trusted > MAX`, so capping trusted first makes it
+     * unsatisfiable. Returning after 90 days across a reboot must still
+     * resolve through the abandonment path rather than be simulated as a
+     * 30-day absence. */
+    { "d095-abandon-across-reboot", true, INT64_C(1000000), 90000,  0u,   0,    INT64_C(1000000) + 90 * PG_TIME_TEST_DAY, 300, 0u, 0, 90 * PG_TIME_TEST_DAY, PG_GAP_CREDIT_MAX_SECONDS, true, false, false, false, false }
 };
 
 static bool run_gap_case(const pg_time_case *test)

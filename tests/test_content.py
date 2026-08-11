@@ -200,25 +200,50 @@ def check_ledger(failures: list[str]) -> None:
     ledger = load(ledger_path)
     assigned = ledger.get("assigned", [])
     if not assigned:
-        # The ledger is authored by the milestone that owns it; while it is
-        # empty the public header is the committed authority and is checked
-        # above. Recording that here is deliberate: a silent skip is how a
-        # ledger stays empty forever.
-        print("test-content: id-ledger.json carries no assignments yet; "
-              "ids checked against the public header instead")
+        # An empty ledger is a FAILURE, not a skip. While it was tolerated the
+        # advertised "ids unmoved" assertion was vacuous: nothing would have
+        # caught a renumbered species, and D-044 makes that undetectable once a
+        # save exists in the wild. A gate that waves through its own empty
+        # input is not a gate.
+        failures.append(
+            "content/id-ledger.json carries no assignments, so the "
+            "append-only id guarantee (D-044) is unenforced — populate it "
+            "from content/*.json")
         return
     by_kind: dict[str, dict[str, int]] = {}
     for record in assigned:
         by_kind.setdefault(record["kind"], {})[record["id"]] = record["numeric_id"]
+    next_id = ledger.get("next_id", {})
     for filename, kind in (("plants.json", "species"), ("pots.json", "pot"),
                            ("spots.json", "spot")):
         recorded = by_kind.get(kind, {})
+        seen_numeric: dict[int, str] = {}
         for entry in load(CONTENT / filename)["entries"]:
             key, numeric = entry.get("id"), entry.get("numeric_id")
-            if key in recorded and recorded[key] != numeric:
+            if key not in recorded:
+                # The direction that actually matters: new content that never
+                # claimed its number.
+                failures.append(
+                    f"{filename}: '{key}' is not in the id ledger — every id "
+                    f"compiled into a save must be recorded there (D-044)")
+            elif recorded[key] != numeric:
                 failures.append(
                     f"{filename}: '{key}' is {numeric} but the id ledger "
                     f"records {recorded[key]}")
+            if numeric in seen_numeric:
+                failures.append(
+                    f"{filename}: {kind} id {numeric} is used by both "
+                    f"'{seen_numeric[numeric]}' and '{key}'")
+            seen_numeric[numeric] = key
+        # next_id must be past everything assigned, or the next author
+        # silently reuses a live number.
+        limit = next_id.get(kind) if isinstance(next_id, dict) else None
+        if limit is None:
+            failures.append(f"id-ledger.json: no next_id for '{kind}'")
+        elif recorded and limit <= max(recorded.values()):
+            failures.append(
+                f"id-ledger.json: next_id['{kind}'] is {limit}, which is not "
+                f"past the highest assigned id {max(recorded.values())}")
 
 
 def walk_strings(node: object, path: str, out: list[tuple[str, str]]) -> None:

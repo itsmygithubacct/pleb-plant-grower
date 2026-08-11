@@ -363,17 +363,13 @@ SPOT_DLI_EXACT = {
 
 # PLANT_CARE.md §9 names which spots satisfy the reachability assertion for
 # which species, precisely so that a test author cannot pick a failing one.
+# The sets below are that table, and check_reachability() below is its
+# executable form.
 #
-# The doc's own four-row table has the "needs" columns of its peace-lily and
-# snake-plant rows transposed against the species values tabled directly above
-# them (it asks the peace lily for peak 10 / floor 1.5, which are the snake
-# plant's numbers, and vice versa). The species table is the transcription
-# target and therefore the authority, so the sets below are derived from it —
-# and they preserve every claim the doc's prose makes: the calathea's set
-# contains spot 2, "the design's intended home", which is the whole of D-093;
-# and the peace lily's set is spot 1 alone, "the only spot inside her light
-# ceiling that gets there", which is why her flower is achievable, slow and
-# light-gated rather than promised.
+# Both were transposed until 2026-08-10: §9's table carried the peace lily's
+# and snake plant's "needs" columns the wrong way round against the species
+# values tabled directly above them, and named two spots that fail. The table
+# now matches these sets and the species table it is transcribed from.
 REACHABILITY_EXPECTED = {
     "golden-pothos": {0, 1, 4},
     "snake-plant-laurentii": {0, 1},
