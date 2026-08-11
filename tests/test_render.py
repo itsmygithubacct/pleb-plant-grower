@@ -39,6 +39,8 @@ def expected_names() -> set[str]:
     names |= {f"background-{scene}" for scene in SCENES}
     names.add("background-off")
     names |= {"localhour-utc", "localhour-plus540"}
+    names |= {"atlas-absent", "atlas-present", "atlas-stage0",
+              "atlas-health4"}
     names |= {f"screen-{s}" for s in
               ("calendar", "chooser", "journal", "away", "damaged",
                "replant")}
@@ -121,6 +123,16 @@ def main(argv: list[str]) -> int:
         differ(f"pot-{pot - 1}", f"pot-{pot}", "pots must differ")
     differ("localhour-utc", "localhour-plus540",
            "gate 8b: the local hour must reach the screen")
+    differ("atlas-absent", "atlas-present",
+           "an atlas must change what is drawn")
+    differ("atlas-present", "atlas-stage0",
+           "growth stage must pick a different atlas column")
+    differ("atlas-present", "atlas-health4",
+           "health must pick a different atlas row")
+    # Proves both axes are read, not that they are the right way round --
+    # the frozen suite hash is what catches a transpose.
+    differ("atlas-stage0", "atlas-health4",
+           "stage and health must select different cells")
 
     if failures:
         for failure in failures:

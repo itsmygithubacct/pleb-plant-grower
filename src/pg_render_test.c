@@ -21,7 +21,12 @@
 #include "kilix_top_down_soft.h"
 #include "kilix_top_down_view.h"
 
+#include <errno.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <zlib.h>
 
 /* ==========================================================================
  * --render-test : the fixture matrix of IMPLEMENTATION_PLAN.md §10.5
@@ -66,7 +71,7 @@
  * instead of failing. That is the only supported way to move it, and it is
  * deliberately not a flag: re-freezing must be a thing somebody decided to do,
  * not something a test run can do by accident. */
-#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x4d7750e06ce3a449)
+#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x35efea6e0312688a)
 
 static int pg_render_test_failures;
 
@@ -248,6 +253,138 @@ static uint64_t render_fixture(ki_td_soft_renderer *renderer,
     return hash;
 }
 
+/* Two small helpers so the fixture atlas can be written without pulling a PNG
+ * encoder into the game. zlib is already linked for kilix-assets. */
+static bool pg_test_make_dirs(const char *path)
+{
+    char buffer[1024];
+    size_t index;
+    size_t length = strlen(path);
+
+    if (length == 0u || length >= sizeof buffer) return false;
+    memcpy(buffer, path, length + 1u);
+    for (index = 1u; index < length; ++index) {
+        if (buffer[index] != '/') continue;
+        buffer[index] = '\0';
+        if (mkdir(buffer, 0700) != 0 && errno != EEXIST) return false;
+        buffer[index] = '/';
+    }
+    return mkdir(buffer, 0700) == 0 || errno == EEXIST;
+}
+
+static void pg_test_put_be32(uint8_t *out, uint32_t value)
+{
+    out[0] = (uint8_t)(value >> 24);
+    out[1] = (uint8_t)(value >> 16);
+    out[2] = (uint8_t)(value >> 8);
+    out[3] = (uint8_t)value;
+}
+
+static bool pg_test_write_chunk(FILE *file, const char *kind,
+                                const uint8_t *payload, size_t size)
+{
+    uint8_t header[4];
+    uint8_t trailer[4];
+    uLong crc;
+
+    pg_test_put_be32(header, (uint32_t)size);
+    if (fwrite(header, 1u, 4u, file) != 4u) return false;
+    if (fwrite(kind, 1u, 4u, file) != 4u) return false;
+    if (size != 0u && fwrite(payload, 1u, size, file) != size) return false;
+    crc = crc32(0L, (const Bytef *)kind, 4);
+    if (size != 0u) crc = crc32(crc, (const Bytef *)payload, (uInt)size);
+    pg_test_put_be32(trailer, (uint32_t)crc);
+    return fwrite(trailer, 1u, 4u, file) == 4u;
+}
+
+static bool pg_test_write_png_rgba(const char *path, const uint8_t *rgba,
+                                   int width, int height)
+{
+    static uint8_t raw[(size_t)640 * 960 * 4 + 960];
+    static uint8_t packed[(size_t)640 * 960 * 4 + 4096];
+    uint8_t header[13];
+    uLongf packed_size = (uLongf)sizeof packed;
+    size_t stride = (size_t)width * 4u;
+    size_t cursor = 0u;
+    FILE *file;
+    int row;
+
+    for (row = 0; row < height; ++row) {
+        raw[cursor++] = 0u;                    /* filter: none */
+        memcpy(raw + cursor, rgba + (size_t)row * stride, stride);
+        cursor += stride;
+    }
+    if (compress2(packed, &packed_size, raw, (uLong)cursor, 6) != Z_OK) {
+        return false;
+    }
+    file = fopen(path, "wbe");
+    if (file == NULL) return false;
+    if (fwrite("\x89PNG\r\n\x1a\n", 1u, 8u, file) != 8u) goto fail;
+    pg_test_put_be32(header, (uint32_t)width);
+    pg_test_put_be32(header + 4, (uint32_t)height);
+    header[8] = 8u;    /* depth */
+    header[9] = 6u;    /* RGBA  */
+    header[10] = 0u; header[11] = 0u; header[12] = 0u;
+    if (!pg_test_write_chunk(file, "IHDR", header, sizeof header)) goto fail;
+    if (!pg_test_write_chunk(file, "IDAT", packed, (size_t)packed_size))
+        goto fail;
+    if (!pg_test_write_chunk(file, "IEND", NULL, 0u)) goto fail;
+    return fclose(file) == 0;
+fail:
+    (void)fclose(file);
+    return false;
+}
+
+/* A synthetic plant atlas, written into the caller's directory so the authored
+ * render path is covered by a fixture rather than only by the procedural one.
+ *
+ * This exists because `make test-render` once passed with a real atlas present
+ * and proved nothing: the suite ran with no asset root, so it never took the
+ * authored branch at all. A fixture that depends on generated art would be
+ * worse -- it would go red whenever the art was mid-regeneration -- so the
+ * atlas is built here, deterministically, from four flat colours per health
+ * row. Flat cells make a wrong cell obvious: if column and row were ever
+ * transposed, the fixture's colours would swap and the golden would move.
+ */
+static bool write_test_atlas(const char *directory, const char *species)
+{
+    enum { WIDTH = 160 * 4, HEIGHT = 160 * 6 };
+    static uint8_t rgba[(size_t)WIDTH * HEIGHT * 4];
+    char path[1024];
+    int written;
+    int column;
+    int row;
+
+    for (row = 0; row < 6; ++row) {
+        for (column = 0; column < 4; ++column) {
+            /* One flat colour per (stage, health), inset by 24 px so the cell
+             * has a transparent border and a wrong offset shows as a seam. */
+            uint8_t red = (uint8_t)(40 + row * 34);
+            uint8_t green = (uint8_t)(200 - row * 28);
+            uint8_t blue = (uint8_t)(60 + column * 40);
+            int y;
+            for (y = 24; y < 160 - 24; ++y) {
+                int x;
+                for (x = 24; x < 160 - 24; ++x) {
+                    size_t offset = ((size_t)(row * 160 + y) * WIDTH
+                                     + (size_t)(column * 160 + x)) * 4u;
+                    rgba[offset] = red;
+                    rgba[offset + 1] = green;
+                    rgba[offset + 2] = blue;
+                    rgba[offset + 3] = 255u;
+                }
+            }
+        }
+    }
+    written = snprintf(path, sizeof path, "%s/graphics/atlases", directory);
+    if (written <= 0 || (size_t)written >= sizeof path) return false;
+    if (!pg_test_make_dirs(path)) return false;
+    written = snprintf(path, sizeof path, "%s/graphics/atlases/%s.png",
+                       directory, species);
+    if (written <= 0 || (size_t)written >= sizeof path) return false;
+    return pg_test_write_png_rgba(path, rgba, WIDTH, HEIGHT);
+}
+
 int pg_render_run_test(uint64_t seed, const char *directory)
 {
     static ki_td_soft_renderer renderer;
@@ -386,6 +523,76 @@ int pg_render_run_test(uint64_t seed, const char *directory)
         }
     }
 
+    /* The authored path. Until this fixture existed the suite ran with no
+     * asset root and never took it, so an atlas could be loaded, sliced and
+     * drawn entirely wrong while every render fixture stayed green. */
+    {
+        static pg_graphics art;
+        uint64_t authored;
+        uint64_t procedural;
+
+        if (write_test_atlas(directory, "pothos")) {
+            fixture_state(&state, seed, (uint8_t)PG_SPECIES_POTHOS, 2u,
+                          (uint8_t)PG_HEALTH_HEALTHY,
+                          (uint8_t)PG_POT_TERRACOTTA, 0,
+                          PG_RENDER_TEST_WALL);
+            procedural = render_fixture(&renderer, &state, &graphics,
+                                        directory, "atlas-absent", &suite);
+            fixtures += 1u;
+
+            (void)pg_graphics_init(&art, directory, NULL, 0u);
+            render_check(art.plant_atlas_valid[PG_SPECIES_POTHOS],
+                         "the fixture atlas did not load");
+            authored = render_fixture(&renderer, &state, &art, directory,
+                                      "atlas-present", &suite);
+            fixtures += 1u;
+            render_check(authored != procedural,
+                         "an atlas was loaded and changed nothing -- the "
+                         "authored path is not being taken");
+
+            /* Column is growth stage, row is health. The checks below prove
+             * both axes are READ -- that changing either picks a different
+             * cell -- which is what catches an axis being ignored entirely.
+             *
+             * They do NOT catch a transpose: swapping the arguments still
+             * yields different cells for different inputs, so all three still
+             * hold. The frozen golden is what catches that, and it does --
+             * verified by swapping the arguments and watching the suite hash
+             * move. Saying so here because the first version of this comment
+             * claimed these assertions caught it, and they do not. */
+            {
+                uint64_t other_stage;
+                uint64_t other_health;
+                fixture_state(&state, seed, (uint8_t)PG_SPECIES_POTHOS, 0u,
+                              (uint8_t)PG_HEALTH_HEALTHY,
+                              (uint8_t)PG_POT_TERRACOTTA, 0,
+                              PG_RENDER_TEST_WALL);
+                other_stage = render_fixture(&renderer, &state, &art,
+                                             directory, "atlas-stage0",
+                                             &suite);
+                fixtures += 1u;
+                fixture_state(&state, seed, (uint8_t)PG_SPECIES_POTHOS, 2u,
+                              (uint8_t)PG_HEALTH_CRITICAL,
+                              (uint8_t)PG_POT_TERRACOTTA, 0,
+                              PG_RENDER_TEST_WALL);
+                other_health = render_fixture(&renderer, &state, &art,
+                                              directory, "atlas-health4",
+                                              &suite);
+                fixtures += 1u;
+                render_check(other_stage != authored,
+                             "two growth stages picked the same atlas cell");
+                render_check(other_health != authored,
+                             "two health states picked the same atlas cell");
+                render_check(other_stage != other_health,
+                             "growth stage and health are indexing the same "
+                             "axis -- column and row are transposed");
+            }
+            pg_graphics_shutdown(&art);
+        } else {
+            render_check(false, "the fixture atlas could not be written");
+        }
+    }
+
     /* Gate 8b: the same instant, two offsets, a calathea either side of dusk.
      * These MUST differ or the renderer is ignoring local time. */
     {
@@ -467,7 +674,7 @@ int pg_render_run_test(uint64_t seed, const char *directory)
     render_check(fixtures == (size_t)(PG_SPECIES_COUNT * PG_STAGE_COUNT *
                                       PG_HEALTH_COUNT) +
                              (size_t)PG_POT_COUNT +
-                             (size_t)PG_SCENE_COUNT + 1u + 6u + 2u,
+                             (size_t)PG_SCENE_COUNT + 1u + 6u + 4u + 2u,
                  "the fixture count is not what §10.5 specifies");
 
     /* The snapping rule, asserted where the arithmetic lives. */
