@@ -163,6 +163,7 @@ test-unit: $(PG_LIB) | $(BUILD)/tests
 
 test-headless: $(BIN)
 	@./$(BIN) --rules-test
+	@./$(BIN) --advice-test
 	@./$(BIN) --calendar-test
 	@./$(BIN) --care-test
 	@./$(BIN) --time-test

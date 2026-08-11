@@ -12,6 +12,7 @@
  */
 #include "pleb_plant_grower.h"
 
+#include "pg_advice.h"
 #include "pg_calendar.h"
 #include "pg_care.h"
 #include "pg_plant.h"
@@ -31,6 +32,7 @@ static void usage(void)
     (void)puts("usage: pleb-plant-grower [--version] [--help]");
     (void)puts("                         [--calendar-test] [--time-test]");
     (void)puts("                         [--care-test] [--rules-test]");
+    (void)puts("                         [--advice-test]");
     (void)puts("                         [--selftest [<seed> [<sim-days>]]]");
     (void)puts("                         [--save-test <dir>]");
     (void)puts("                         [--render-test <seed> <dir>]");
@@ -120,6 +122,12 @@ static int cmd_rules(int extra, char **args)
     return pg_plant_run_rules_test();
 }
 
+static int cmd_advice(int extra, char **args)
+{
+    (void)extra; (void)args;
+    return pg_advice_run_test();
+}
+
 /* Both arguments are optional and defaulted, so --selftest on its own is still
  * a meaningful gate. Neither may be garbage. */
 static int cmd_selftest(int extra, char **args)
@@ -177,6 +185,7 @@ static const pg_command COMMANDS[] = {
     { "--time-test",     0, 0, "",                        cmd_time },
     { "--care-test",     0, 0, "",                        cmd_care },
     { "--rules-test",    0, 0, "",                        cmd_rules },
+    { "--advice-test",   0, 0, "",                        cmd_advice },
     { "--selftest",      0, 2, " [<seed> [<sim-days>]]",  cmd_selftest },
     { "--save-test",     1, 1, " <dir>",                  cmd_save_test },
     { "--render-test",   2, 2, " <seed> <dir>",           cmd_render_test },

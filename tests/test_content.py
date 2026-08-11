@@ -259,20 +259,70 @@ def walk_strings(node: object, path: str, out: list[tuple[str, str]]) -> None:
         out.append((path, node))
 
 
+def c_string_literals(path: Path) -> list[tuple[str, str]]:
+    """Every "..." literal in a C file, with a file:line label.
+
+    Crude on purpose: it over-reports (an #include path is a literal too) and
+    over-reporting costs nothing here, while under-reporting would let a myth
+    ship. The blocklist needles are English phrases, so a path or a format
+    string never matches one by accident.
+    """
+    out: list[tuple[str, str]] = []
+    for number, line in enumerate(path.read_text().splitlines(), start=1):
+        cursor = 0
+        while True:
+            start = line.find('"', cursor)
+            if start < 0:
+                break
+            end = start + 1
+            while end < len(line):
+                if line[end] == "\\":
+                    end += 2
+                    continue
+                if line[end] == '"':
+                    break
+                end += 1
+            if end >= len(line):
+                break
+            out.append((f"{path.name}:{number}", line[start + 1:end]))
+            cursor = end + 1
+    return out
+
+
 def check_myths(failures: list[str]) -> int:
+    """The blocklist, over every player-visible string the game can produce.
+
+    That deliberately includes src/pg_advice.c. The instruction surface is
+    exactly where a myth would be most damaging and most plausible -- it is
+    the file whose whole job is to sound authoritative -- and leaving it to
+    review would be leaving it to the one check a well-written myth passes.
+
+    The advice strings are C rather than JSON because they are chosen by code
+    that reads the care axes, not looked up by key. Scanning the source is the
+    honest way to cover them; moving them to JSON purely to satisfy a test
+    would be the tail wagging the dog.
+    """
     checked = 0
+    sources: list[tuple[str, str]] = []
     for path in sorted(CONTENT.rglob("*.json")):
         data = load(path)
         strings: list[tuple[str, str]] = []
         walk_strings(data, path.name, strings)
-        for where, text in strings:
-            checked += 1
-            lowered = text.lower()
-            for needle, reality in MYTHS.items():
-                if needle in lowered:
-                    failures.append(
-                        f"{where}: says \"{needle}\" — blocklisted "
-                        f"(PLANT_CARE.md §7: {reality})")
+        sources.extend(strings)
+    advice = ROOT / "src" / "pg_advice.c"
+    if not advice.exists():
+        failures.append("src/pg_advice.c is missing; the instruction surface "
+                        "is not being checked against the myth blocklist")
+    else:
+        sources.extend(c_string_literals(advice))
+    for where, text in sources:
+        checked += 1
+        lowered = text.lower()
+        for needle, reality in MYTHS.items():
+            if needle in lowered:
+                failures.append(
+                    f"{where}: says \"{needle}\" — blocklisted "
+                    f"(PLANT_CARE.md §7: {reality})")
     return checked
 
 
