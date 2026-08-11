@@ -13,3 +13,10 @@ render_*.ppm
 # WAVs themselves would be 600 KB of binary that git cannot diff and
 # that the manifest already pins.
 assets/sfx/*.wav
+
+# The three procedural atlases are build products for the same reason
+# the SFX bank is: tools/gen_art.py makes them byte-for-byte from
+# integer arithmetic, and `make art-check` gates them against it.
+assets/graphics/atlases/ui-skin.png
+assets/graphics/atlases/glyphs.png
+assets/graphics/atlases/particles.png

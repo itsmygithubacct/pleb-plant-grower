@@ -23,7 +23,7 @@ SKIP_FILES = {"pleb-plant-grower"}
 # rather than by git. The point of this check is that nothing SHIPS untracked;
 # a file the build makes deterministically and a committed manifest hashes is
 # tracked in the only sense that matters.
-SKIP_GLOBS = ("assets/sfx/*.wav",)
+SKIP_GLOBS = ("assets/sfx/*.wav", "assets/graphics/atlases/*.png")
 
 
 def walk() -> list[Path]:

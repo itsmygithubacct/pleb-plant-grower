@@ -89,6 +89,7 @@ ORIG_SKIP     := --exclude-dir=fixtures
 ORIG_SELF     := ^Makefile:[0-9]+:ORIG_[A-Z_]+ +:=
 
 .PHONY: all test test-cli test-unit test-noalloc test-headless test-render \
+        art-check \
         test-content \
         generated-check test-assets test-backgrounds test-art-review test-save \
         embed-guard check-release-tree originality art sfx check-sfx sanitize \
@@ -137,6 +138,7 @@ $(BIN): $(BUILD)/obj/main.o $(BUILD)/obj/pg_term.o $(BUILD)/obj/pg_render_test.o
 
 test: test-cli test-unit test-noalloc test-headless test-render test-content \
       test-assets test-backgrounds test-art-review test-save check-sfx \
+      art-check \
       embed-guard originality check-release-tree
 
 test-cli: $(BIN)
@@ -249,6 +251,9 @@ originality:
 
 art:
 	$(PYTHON) tools/gen_art.py
+
+art-check:
+	@$(PYTHON) tools/gen_art.py --check
 
 sfx:
 	$(PYTHON) tools/gen_sfx.py --out assets/sfx --manifest docs/audio-provenance.json
