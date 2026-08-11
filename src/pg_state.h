@@ -31,6 +31,7 @@
 #include "pg_rng.h"
 #include "pg_scene.h"
 #include "pg_time.h"
+#include "pg_ui.h"
 
 #include "kilix_assets.h"
 
@@ -111,6 +112,11 @@ struct pg_state {
     pg_audio_event audio[PG_AUDIO_QUEUE_MAX];
     bool save_failed;               /* sticky; the renderer shows it          */
     bool replant_offered;           /* a death opened the replant flow        */
+    /* Which screen you are looking at. Live-only and deliberately not in the
+     * save record: a screen is not a fact about the plant, and restoring
+     * somebody into a modal they had already dismissed is worse than putting
+     * them back in front of the plant (pg_ui.h). */
+    pg_ui_state ui;
 };
 
 /* ---- settings: standalone only, and deliberately fail-soft --------------

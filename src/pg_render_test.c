@@ -66,7 +66,7 @@
  * instead of failing. That is the only supported way to move it, and it is
  * deliberately not a flag: re-freezing must be a thing somebody decided to do,
  * not something a test run can do by accident. */
-#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0xa6c32f5e95b9bce7)
+#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x4d7750e06ce3a449)
 
 static int pg_render_test_failures;
 
@@ -334,6 +334,58 @@ int pg_render_run_test(uint64_t seed, const char *directory)
     }
     (void)pg_graphics_set_scene(&graphics, NULL);
 
+    /* The screens. The plan asks for calendar and chooser fixtures by name;
+     * the journal and the two modal screens come along because they are the
+     * same layout code and a screen nobody renders is a screen nobody
+     * notices breaking. */
+    {
+        static const uint8_t SCREENS[] = {
+            (uint8_t)PG_SCREEN_CALENDAR, (uint8_t)PG_SCREEN_CHOOSER,
+            (uint8_t)PG_SCREEN_JOURNAL,  (uint8_t)PG_SCREEN_AWAY,
+            (uint8_t)PG_SCREEN_DAMAGED,  (uint8_t)PG_SCREEN_REPLANT
+        };
+        static const char *const SCREEN_NAMES[] = {
+            "calendar", "chooser", "journal", "away", "damaged", "replant"
+        };
+        uint64_t screen_hash[sizeof SCREENS / sizeof SCREENS[0]];
+        size_t screen;
+
+        for (screen = 0u; screen < sizeof SCREENS / sizeof SCREENS[0];
+             ++screen) {
+            fixture_state(&state, seed, (uint8_t)PG_SPECIES_PEACE_LILY, 2u,
+                          (uint8_t)PG_HEALTH_HEALTHY,
+                          (uint8_t)PG_POT_TERRACOTTA, 0,
+                          PG_RENDER_TEST_WALL);
+            /* A few journal entries so the calendar has marks and the journal
+             * has rows: an empty screen renders, and proves nothing. */
+            pg_journal_push(&state, 3u, (uint8_t)PG_JOURNAL_WATERED, 9u, 0u);
+            pg_journal_push(&state, 5u, (uint8_t)PG_JOURNAL_FED, 11u, 0u);
+            pg_journal_push(&state, 9u, (uint8_t)PG_JOURNAL_NEW_LEAF, 14u, 0u);
+            pg_journal_push(&state, 12u, (uint8_t)PG_JOURNAL_THIRSTY, 8u, 0u);
+            state.ui.screen = SCREENS[screen];
+            if (SCREENS[screen] == (uint8_t)PG_SCREEN_CHOOSER) {
+                state.ui.chooser_step = (uint8_t)PG_CHOOSER_SPECIES;
+            }
+            (void)snprintf(name, sizeof name, "screen-%s",
+                           SCREEN_NAMES[screen]);
+            screen_hash[screen] = render_fixture(&renderer, &state, &graphics,
+                                                 directory, name, &suite);
+            fixtures += 1u;
+        }
+        /* The journal and the away report are deliberately the SAME screen:
+         * the away report is the journal filtered to the last absence, and
+         * giving it its own layout would mean two layouts to keep in
+         * agreement. Assert that on purpose. Every other pair must differ. */
+        render_check(screen_hash[2] == screen_hash[3],
+                     "journal and away are one layout and must match");
+        for (screen = 1u; screen < sizeof SCREENS / sizeof SCREENS[0];
+             ++screen) {
+            if (screen == 3u) continue;    /* away, matched above */
+            render_check(screen_hash[screen] != screen_hash[screen - 1u],
+                         "two distinct screens rendered identically");
+        }
+    }
+
     /* Gate 8b: the same instant, two offsets, a calathea either side of dusk.
      * These MUST differ or the renderer is ignoring local time. */
     {
@@ -386,19 +438,28 @@ int pg_render_run_test(uint64_t seed, const char *directory)
         uint8_t light_a = (index == (size_t)PG_SCENE_COUNT)
                         ? (uint8_t)PG_LIGHT_FROM_FRONT
                         : graphics.scenes[index].light_from;
+        uint8_t panel_a = (index == (size_t)PG_SCENE_COUNT)
+                        ? (uint8_t)PG_PANEL_RIGHT
+                        : graphics.scenes[index].panel_side;
         for (other = index + 1u; other <= (size_t)PG_SCENE_COUNT; ++other) {
             uint8_t light_b = (other == (size_t)PG_SCENE_COUNT)
                             ? (uint8_t)PG_LIGHT_FROM_FRONT
                             : graphics.scenes[other].light_from;
-            if (light_a == light_b) {
+            uint8_t panel_b = (other == (size_t)PG_SCENE_COUNT)
+                            ? (uint8_t)PG_PANEL_RIGHT
+                            : graphics.scenes[other].panel_side;
+            /* Since the HUD landed a scene decides TWO visible things with no
+             * plate loaded: which side lights the plant, and which side the
+             * panel sits on. Both must match for two scenes to agree. */
+            if (light_a == light_b && panel_a == panel_b) {
                 render_check(background_hash[index] == background_hash[other],
-                             "two scenes lit from the same side, with no "
-                             "plate loaded, rendered differently");
+                             "two scenes with the same light and panel side, "
+                             "with no plate loaded, rendered differently");
             } else {
                 render_check(background_hash[index] != background_hash[other],
-                             "two scenes lit from different sides rendered "
-                             "identically -- light_from is not reaching the "
-                             "screen");
+                             "two scenes differing in light or panel side "
+                             "rendered identically -- the scene is not "
+                             "reaching the screen");
             }
         }
     }
@@ -406,7 +467,7 @@ int pg_render_run_test(uint64_t seed, const char *directory)
     render_check(fixtures == (size_t)(PG_SPECIES_COUNT * PG_STAGE_COUNT *
                                       PG_HEALTH_COUNT) +
                              (size_t)PG_POT_COUNT +
-                             (size_t)PG_SCENE_COUNT + 1u + 2u,
+                             (size_t)PG_SCENE_COUNT + 1u + 6u + 2u,
                  "the fixture count is not what §10.5 specifies");
 
     /* The snapping rule, asserted where the arithmetic lives. */

@@ -39,6 +39,9 @@ def expected_names() -> set[str]:
     names |= {f"background-{scene}" for scene in SCENES}
     names.add("background-off")
     names |= {"localhour-utc", "localhour-plus540"}
+    names |= {f"screen-{s}" for s in
+              ("calendar", "chooser", "journal", "away", "damaged",
+               "replant")}
     return names
 
 

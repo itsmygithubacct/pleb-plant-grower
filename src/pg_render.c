@@ -41,6 +41,7 @@
 #include "pg_scene.h"
 #include "pg_sim.h"
 #include "pg_state.h"
+#include "pg_ui.h"
 
 #include "kilix_top_down_soft.h"
 #include "kilix_top_down_view.h"
@@ -469,7 +470,10 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
         ki_td_soft_rgba_backdrop(renderer, &view, &front, 1.0f);
     }
 
-    /* Layers 8 and 9 arrive with Milestone 7. */
+    /* Layers 8 and 9: the HUD and the calendar/journal, all through
+     * kilix-ui. Drawn over the occluder because the interface belongs to the
+     * player, not to the room. */
+    pg_ui_draw(renderer, &view, state, &state->ui, graphics);
 
     canvas->clip_x0 = clip_x0; canvas->clip_y0 = clip_y0;
     canvas->clip_x1 = clip_x1; canvas->clip_y1 = clip_y1;

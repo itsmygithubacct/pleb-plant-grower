@@ -44,6 +44,7 @@
 #include "pg_content.h"
 #include "pg_plant.h"
 #include "pg_state.h"
+#include "pg_ui.h"
 #include "pg_time.h"
 
 #include <inttypes.h>
@@ -92,6 +93,7 @@ void pg_init(pg_state *state, uint64_t seed)
      * all three of these before the first advance if the player wants. */
     pg_plant_init(&state->plants[0], (uint8_t)PG_SPECIES_POTHOS,
                   (uint8_t)PG_POT_NURSERY, (uint8_t)PG_SPOT_DEFAULT, 0);
+    pg_ui_init(&state->ui);
 }
 
 static bool pg_fail_state(char *error, size_t error_size, const char *what)
