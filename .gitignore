@@ -20,3 +20,4 @@ assets/sfx/*.wav
 assets/graphics/atlases/ui-skin.png
 assets/graphics/atlases/glyphs.png
 assets/graphics/atlases/particles.png
+dist

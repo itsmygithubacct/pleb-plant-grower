@@ -302,8 +302,21 @@ install: all
 	install -Dm755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 	install -Dm644 docs/pleb-plant-grower.6 \
 		$(DESTDIR)$(PREFIX)/share/man/man6/pleb-plant-grower.6
-	@find assets -type f -print0 | while IFS= read -r -d '' f; do \
-		install -Dm644 "$$f" "$(DESTDIR)$(PREFIX)/share/$(BIN)/$$f"; done
+	@# POSIX sh, not bash. `read -d ''` is a bashism and /bin/sh is dash on
+	@# Debian, so the previous form failed with "Illegal option -d" -- on
+	@# stderr, inside a recipe prefixed with @, which is how `make install`
+	@# quietly shipped a binary with none of its assets.
+	@find assets -type f -exec sh -c \
+		'for f do install -Dm644 "$$f" \
+			"$(DESTDIR)$(PREFIX)/share/$(BIN)/$$f"; done' sh {} +
+	@# Assert it actually happened. A silent install is the failure this
+	@# target just had, and a count is the cheapest way to notice it.
+	@staged=$$(find "$(DESTDIR)$(PREFIX)/share/$(BIN)" -type f 2>/dev/null | wc -l); \
+	source=$$(find assets -type f | wc -l); \
+	test "$$staged" -eq "$$source" || { \
+		echo "install: staged $$staged of $$source asset files" >&2; \
+		exit 1; }
+	@echo "install: PASS ($(DESTDIR)$(PREFIX))"
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN)
@@ -314,10 +327,14 @@ release-gate: test test-shared test-clang sanitize embed-guard originality \
               check-release-tree test-art-review
 	@echo "release-gate: PASS"
 
+# Reproducible: sorted, no owner, no mtime. Two runs of `make dist` from one
+# commit produce identical bytes, which is what lets a release be verified
+# rather than trusted.
 dist: all
+	@mkdir -p dist
 	@tar --sort=name --owner=0 --group=0 --numeric-owner \
-		--mtime='@0' -czf $(BIN)-$(VERSION).tar.gz \
-		--exclude='./build' --exclude='./.git' .
+		--mtime='@0' -czf dist/$(BIN)-$(VERSION).tar.gz \
+		--exclude='./build' --exclude='./.git' --exclude='./dist' .
 
 clean:
 	rm -rf $(BUILD) $(BIN)

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "_status": "PREPARED, NOT REGISTERED",
+  "_why": "kilix-content's catalog contract requires an immutable remote commit to fetch from, and this game has no remote until the owner calls it complete. So the row is designed and left here; adding it to the catalog is a one-line change once a remote exists. Registering a row that points at nothing would be worse than not registering one.",
+  "entry": {
+    "id": "pleb-plant-grower",
+    "kind": "game",
+    "name": "Pleb Plant Grower",
+    "summary": "A realtime houseplant you actually have to look after.",
+    "repository": "<set when published>",
+    "commit": "<set when published>",
+    "build": "make",
+    "binary": "pleb-plant-grower",
+    "man_page": "docs/pleb-plant-grower.6",
+    "embeds_into": [
+      "kilix-land"
+    ],
+    "embed_fragment": "mk/pleb-plant-grower.mk"
+  }
+}

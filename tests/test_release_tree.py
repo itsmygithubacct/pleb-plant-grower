@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FORBIDDEN_SUFFIX = (".pyc", ".o", ".a", ".core")
 FORBIDDEN_NAME = ("core", "__pycache__")
 FORBIDDEN_GLOB = ("render_*.ppm",)
-SKIP_DIRS = {".git", "build", "third_party"}
+SKIP_DIRS = {".git", "build", "third_party", "dist"}
 # Build outputs that legitimately sit in the tree after `make` and are
 # legitimately untracked. Everything else untracked is a finding.
 SKIP_FILES = {"pleb-plant-grower"}
