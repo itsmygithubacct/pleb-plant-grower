@@ -356,13 +356,48 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", type=pathlib.Path,
                         default=pathlib.Path("assets/graphics/atlases"))
     parser.add_argument("--species", action="append")
-    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--check", action="store_true",
+                        help="verify the built atlases match their masters "
+                             "rather than rewriting them")
     args = parser.parse_args(argv[1:])
 
     root = pathlib.Path(__file__).resolve().parent.parent
     source = (root / args.source).resolve()
     out = (root / args.out).resolve()
     wanted = args.species or list(SPECIES)
+
+    # --check was accepted and ignored, so it rebuilt the atlases and reported
+    # success -- a check that performs the action it is meant to verify, and
+    # can therefore never fail. It builds into a temporary directory now and
+    # compares, leaving the tree untouched.
+    if args.check:
+        import tempfile
+        failures = []
+        with tempfile.TemporaryDirectory() as scratch:
+            for species in wanted:
+                built = out / f"{species}.png"
+                if not built.is_file():
+                    failures.append(f"{species}: no atlas; run make graphics")
+                    continue
+                try:
+                    _, digest = build_atlas(species, source,
+                                            pathlib.Path(scratch))
+                except SystemExit as error:
+                    failures.append(f"{species}: {error}")
+                    continue
+                have = hashlib.sha256(built.read_bytes()).hexdigest()
+                if have != digest:
+                    failures.append(
+                        f"{species}: atlas drifted from its masters\n"
+                        f"    committed {have[:16]}\n"
+                        f"    rebuilt   {digest[:16]}")
+        if failures:
+            for failure in failures:
+                print(f"prepare-graphics: {failure}", file=sys.stderr)
+            return 1
+        print(f"prepare-graphics: PASS ({len(wanted)} atlas"
+              f"{'es' if len(wanted) != 1 else ''} match their masters)")
+        return 0
 
     results = {}
     for species in wanted:
