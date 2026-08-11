@@ -1,4 +1,118 @@
 {
   "schema_version": 1,
-  "entries": []
+  "_source": "PLANT_CARE.md §4.4 and GAME_DESIGN.md §8.4 carry the same six-row table; it is authored here once (D-084). Light band and DLI peak/floor are the research's; the RH, temperature and airflow curves are design, consistent with the research's §4.1 heating claim and §3.3 window geometry.",
+  "_reachability_note": "Every species threshold in PLANT_CARE.md §9 must be reachable from this table: for each species there must be a spot inside its light_max whose dli_peak_c meets dli_thriving_c (and any non-zero dli_flower_c) and whose dli_floor_c meets dli_maintenance_c. tools/check_care_schedule.py asserts it; it is not a convention.",
+  "_light_bands": ["LOW", "MEDIUM", "BRIGHT_INDIRECT", "DIRECT"],
+  "_curve_note": "Temperatures are tenths of a degree C. Summer and winter are the two ends the season scalar interpolates between; day and night are the two ends the daylight window interpolates between. RH is whole percent. airflow_q12 multiplies the drain chain (PLANT_CARE.md §4.2, the draughty row).",
+
+  "entries": [
+    {
+      "numeric_id": 0,
+      "id": "sill-south",
+      "display_name": "On the sill, south",
+      "light_band": "DIRECT",
+      "dli_peak_c": 1800,
+      "dli_floor_c": 600,
+      "default_scene": "sunny-sill",
+
+      "temp_summer_day_c_x10": 260,
+      "temp_summer_night_c_x10": 160,
+      "temp_winter_day_c_x10": 200,
+      "temp_winter_night_c_x10": 100,
+      "rh_summer_pct": 45,
+      "rh_winter_pct": 30,
+      "airflow_q12": 4506,
+      "cold_glass": true
+    },
+    {
+      "numeric_id": 1,
+      "id": "one-metre",
+      "display_name": "1 m in",
+      "light_band": "BRIGHT_INDIRECT",
+      "dli_peak_c": 1250,
+      "dli_floor_c": 400,
+      "default_scene": "bright-corner",
+
+      "temp_summer_day_c_x10": 220,
+      "temp_summer_night_c_x10": 190,
+      "temp_winter_day_c_x10": 210,
+      "temp_winter_night_c_x10": 180,
+      "rh_summer_pct": 45,
+      "rh_winter_pct": 32,
+      "airflow_q12": 4096,
+      "cold_glass": false
+    },
+    {
+      "numeric_id": 2,
+      "id": "two-metre",
+      "display_name": "2 m in",
+      "light_band": "MEDIUM",
+      "dli_peak_c": 500,
+      "dli_floor_c": 180,
+      "default_scene": "study-desk",
+
+      "temp_summer_day_c_x10": 210,
+      "temp_summer_night_c_x10": 190,
+      "temp_winter_day_c_x10": 200,
+      "temp_winter_night_c_x10": 180,
+      "rh_summer_pct": 47,
+      "rh_winter_pct": 33,
+      "airflow_q12": 3891,
+      "cold_glass": false
+    },
+    {
+      "numeric_id": 3,
+      "id": "north-shelf",
+      "display_name": "North shelf",
+      "light_band": "LOW",
+      "dli_peak_c": 300,
+      "dli_floor_c": 100,
+      "default_scene": "plain-studio",
+
+      "temp_summer_day_c_x10": 200,
+      "temp_summer_night_c_x10": 180,
+      "temp_winter_day_c_x10": 180,
+      "temp_winter_night_c_x10": 160,
+      "rh_summer_pct": 50,
+      "rh_winter_pct": 35,
+      "airflow_q12": 3686,
+      "cold_glass": false
+    },
+    {
+      "numeric_id": 4,
+      "id": "radiator-shelf",
+      "display_name": "Above the radiator",
+      "light_band": "BRIGHT_INDIRECT",
+      "dli_peak_c": 900,
+      "dli_floor_c": 300,
+      "default_scene": "kitchen-shelf",
+
+      "temp_summer_day_c_x10": 240,
+      "temp_summer_night_c_x10": 210,
+      "temp_winter_day_c_x10": 260,
+      "temp_winter_night_c_x10": 230,
+      "rh_summer_pct": 42,
+      "rh_winter_pct": 22,
+      "airflow_q12": 4915,
+      "cold_glass": false
+    },
+    {
+      "numeric_id": 5,
+      "id": "bath-shelf",
+      "display_name": "Bathroom shelf",
+      "light_band": "MEDIUM",
+      "dli_peak_c": 400,
+      "dli_floor_c": 140,
+      "default_scene": "steamy-bath",
+
+      "temp_summer_day_c_x10": 220,
+      "temp_summer_night_c_x10": 200,
+      "temp_winter_day_c_x10": 220,
+      "temp_winter_night_c_x10": 200,
+      "rh_summer_pct": 65,
+      "rh_winter_pct": 58,
+      "airflow_q12": 3686,
+      "cold_glass": false
+    }
+  ]
 }

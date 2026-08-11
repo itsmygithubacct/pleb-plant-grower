@@ -1,4 +1,81 @@
 {
   "schema_version": 1,
-  "entries": []
+  "_source": "PLANT_CARE.md §4.3 for the daylight curve, the season scalar and solar noon; §4.2 for the drain multiplier chain, whose Season row cannot be authored apart from the curve that produces it; the research's month-by-month calendar for the twelve advisory rows.",
+
+  "_solar_note": "The daylight curve gives the day's length, never its placement. solar_noon_local_minutes is what puts it on the local clock, and every local-hour rule in the game hangs off it (D-080). It is a modelling choice, not a measured constant, and the game never claims a real sunrise or sunset for the player's own location.",
+  "solar_noon_local_minutes": 780,
+  "hemisphere_offset_days": 182,
+
+  "daylight_curve": {
+    "_form": "daylight_hours(d) = mean_hours + amplitude_hours * cos(2*pi*(d - peak_ordinal)/period_days), sampled at integer ordinals into a baked 366-entry table and never recomputed at runtime",
+    "mean_hours": 12.2,
+    "amplitude_hours": 3.3,
+    "peak_ordinal": 172,
+    "period_days": 365
+  },
+
+  "season_scalar": {
+    "_form": "season_scalar = clamp01((daylight_hours - offset_hours) / span_hours)",
+    "offset_hours": 8.5,
+    "span_hours": 7.0,
+    "growing_threshold_l": 4500,
+    "first_growing_ordinal": 72,
+    "last_growing_ordinal": 272
+  },
+
+  "recovery": {
+    "_note": "Every recovery, shock and fair-warning division uses effective_scalar = max(growth_scalar, 0.30), never the raw scalar (D-085). The raw curve bottoms out near 0.06, which would turn a three-week repot shock into a year. Growth rate itself is not floored: a plant really does stop growing in midwinter.",
+    "effective_scalar_floor_q12": 1229
+  },
+
+  "multiplier_chain": {
+    "_note": "PLANT_CARE.md §4.2. All are [MED] on the exact figure and [HIGH] on direction and rough magnitude — tuning parameters, not constants.",
+    "light": {
+      "DIRECT": 5530,
+      "BRIGHT_INDIRECT": 4096,
+      "MEDIUM": 3072,
+      "LOW": 2253
+    },
+    "temperature": {
+      "above_26_c": 5325,
+      "band_20_26_c": 4096,
+      "band_16_20_c": 3072,
+      "below_16_c": 2253
+    },
+    "humidity": {
+      "below_35_pct": 4915,
+      "band_35_60_pct": 4096,
+      "above_60_pct": 3277
+    },
+    "season": {
+      "_note": "The growth scalar runs 1.0 -> 0.0 and the drain multiplier runs x1.0 -> x0.45 with it.",
+      "growing_q12": 4096,
+      "dormant_q12": 1843
+    },
+    "root_mass": {
+      "sparse": 2867,
+      "established": 4096,
+      "rootbound": 6554
+    }
+  },
+
+  "_months_note": "Advisory only: the calendar screen and the notebook read these; nothing in the simulation branches on a month. The season is derived from the daylight curve, never hard-coded (PLANT_CARE.md §4.3).",
+  "_water_levels": ["MINIMUM", "LOW", "RISING", "NEAR_PEAK", "PEAK", "FALLING"],
+  "_feed_levels": ["NONE", "QUARTER", "HALF", "LAST_FULL"],
+  "_repot_levels": ["DISCOURAGED", "GOOD", "BEST", "CLOSING", "LAST"],
+
+  "months": [
+    { "month": 1,  "water": "MINIMUM",   "feed": "NONE",      "repot": "DISCOURAGED" },
+    { "month": 2,  "water": "MINIMUM",   "feed": "NONE",      "repot": "DISCOURAGED" },
+    { "month": 3,  "water": "RISING",    "feed": "QUARTER",   "repot": "BEST" },
+    { "month": 4,  "water": "RISING",    "feed": "HALF",      "repot": "BEST" },
+    { "month": 5,  "water": "NEAR_PEAK", "feed": "HALF",      "repot": "CLOSING" },
+    { "month": 6,  "water": "PEAK",      "feed": "HALF",      "repot": "GOOD" },
+    { "month": 7,  "water": "PEAK",      "feed": "HALF",      "repot": "GOOD" },
+    { "month": 8,  "water": "PEAK",      "feed": "HALF",      "repot": "GOOD" },
+    { "month": 9,  "water": "FALLING",   "feed": "LAST_FULL", "repot": "LAST" },
+    { "month": 10, "water": "FALLING",   "feed": "NONE",      "repot": "DISCOURAGED" },
+    { "month": 11, "water": "LOW",       "feed": "NONE",      "repot": "DISCOURAGED" },
+    { "month": 12, "water": "MINIMUM",   "feed": "NONE",      "repot": "DISCOURAGED" }
+  ]
 }

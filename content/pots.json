@@ -1,4 +1,102 @@
 {
   "schema_version": 1,
-  "entries": []
+  "_source": "PLANT_CARE.md §5 for the drain multipliers and the real pot behaviours; GAME_DESIGN.md §3.1 for the layer shares, the reservoir, the soil-temperature offset and the style rating, which are design rather than research.",
+
+  "_saturation_note": "One species-independent constant, authored exactly once, here (PLANT_CARE.md §4.5, D-082). Species differ only in how many soggy hours they tolerate, never in where the threshold sits. The cachepot's bottom_floor_l is 9200 — strictly above it — which is what makes 'the soggy hours never stop accumulating' literally true rather than a figure of speech.",
+  "saturation_level": 8500,
+
+  "_uptake_share_note": "Root uptake's share of the drain chain is species-independent and pot-independent; the pot only decides how the remainder splits between the surface and the porous wall. surface_share_q12 is derived: 4096 - side_evaporation_share_q12 - uptake_share_q12.",
+  "uptake_share_q12": 1638,
+  "percolation_q12": 205,
+
+  "entries": [
+    {
+      "numeric_id": 0,
+      "id": "terracotta",
+      "display_name": "Old Clay",
+      "material": "unglazed terracotta, drainage hole",
+
+      "drain_multiplier_q12": 5734,
+      "side_evaporation_share_q12": 1843,
+      "reservoir_q12": 4096,
+      "bottom_floor_l": 0,
+      "soil_temp_offset_c_x10": -15,
+      "salt_retention_q12": 2867,
+
+      "has_drainage": true,
+      "is_sleeve_capable": false,
+      "is_sleeve_liner": false,
+      "can_be_flushed": true,
+      "shows_salt_crust": true,
+      "shows_roots_at_holes": false,
+      "tip_risk_l": 2000,
+      "style": 3
+    },
+    {
+      "numeric_id": 1,
+      "id": "glazed",
+      "display_name": "The Good China",
+      "material": "glazed ceramic, drainage hole",
+
+      "drain_multiplier_q12": 4096,
+      "side_evaporation_share_q12": 0,
+      "reservoir_q12": 4301,
+      "bottom_floor_l": 0,
+      "soil_temp_offset_c_x10": 0,
+      "salt_retention_q12": 4096,
+
+      "has_drainage": true,
+      "is_sleeve_capable": false,
+      "is_sleeve_liner": false,
+      "can_be_flushed": true,
+      "shows_salt_crust": false,
+      "shows_roots_at_holes": false,
+      "tip_risk_l": 1000,
+      "style": 4
+    },
+    {
+      "numeric_id": 2,
+      "id": "nursery",
+      "display_name": "Nursery Black",
+      "material": "plastic nursery pot, many holes",
+
+      "drain_multiplier_q12": 4301,
+      "side_evaporation_share_q12": 205,
+      "reservoir_q12": 3891,
+      "bottom_floor_l": 0,
+      "soil_temp_offset_c_x10": 5,
+      "salt_retention_q12": 4096,
+
+      "has_drainage": true,
+      "is_sleeve_capable": false,
+      "is_sleeve_liner": true,
+      "can_be_flushed": true,
+      "shows_salt_crust": false,
+      "shows_roots_at_holes": true,
+      "tip_risk_l": 7000,
+      "style": 1
+    },
+    {
+      "numeric_id": 3,
+      "id": "cachepot",
+      "display_name": "The Handsome Trap",
+      "material": "decorative cachepot, no drainage",
+
+      "drain_multiplier_q12": 2662,
+      "side_evaporation_share_q12": 0,
+      "reservoir_q12": 4915,
+      "bottom_floor_l": 9200,
+      "soil_temp_offset_c_x10": -5,
+      "salt_retention_q12": 5734,
+
+      "has_drainage": false,
+      "is_sleeve_capable": true,
+      "is_sleeve_liner": false,
+      "can_be_flushed": false,
+      "shows_salt_crust": false,
+      "shows_roots_at_holes": false,
+      "tip_risk_l": 2000,
+      "style": 5
+    }
+  ]
 }

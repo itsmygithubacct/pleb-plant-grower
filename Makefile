@@ -54,6 +54,9 @@ STRICT_CFLAGS := -O2 -g -std=c11 -Wall -Wextra -Wpedantic -Werror \
 	-Wconversion -Wsign-conversion -Wshadow -Wformat=2
 LDLIBS  ?= $(KILIX_ASSETS_LDLIBS) $(KILIX_GAME_KIT_LDLIBS)
 
+GENERATED_HEADER := $(BUILD)/pg_content_generated.h
+CONTENT_JSON := $(wildcard content/*.json)
+
 CORE_SRC := $(filter-out src/main.c src/pg_term.c,$(wildcard src/*.c))
 CORE_OBJ := $(patsubst src/%.c,$(BUILD)/obj/%.o,$(CORE_SRC))
 VENDOR_OBJ := $(BUILD)/obj/chip_sequencer.o
@@ -96,6 +99,14 @@ $(VENDOR_OBJ): $(CHIP_SEQUENCER_DIR)/src/chip_sequencer.c | $(BUILD)/obj
 
 $(BUILD)/obj/%.o: src/%.c | $(BUILD)/obj
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(GAME_CFLAGS) -c $< -o $@
+
+# content/*.json is the authored source; the header is a build product and is
+# regenerated whenever the JSON moves, so it can never be stale in the tree.
+$(GENERATED_HEADER): $(CONTENT_JSON) tools/compile_content.py \
+                     tools/check_care_schedule.py | $(BUILD)
+	$(PYTHON) tools/compile_content.py --out $@
+
+$(CORE_OBJ) $(BUILD)/obj/main.o: $(GENERATED_HEADER)
 
 # Per-object SDK header dependencies, declared by hand (house style).
 $(BUILD)/obj/pg_render.o: $(SOFT_RASTER_DIR)/include/soft_raster.h
@@ -152,13 +163,23 @@ test-render: $(BIN)
 	@dir=$$(mktemp -d); ./$(BIN) --render-test 7 $$dir && \
 		$(PYTHON) tests/test_render.py $$dir; rc=$$?; rm -rf $$dir; exit $$rc
 
-test-content:
-	@if [ -x tools/compile_content.py ]; then \
-		PYTHONPATH=$(KILIX_GAME_TOOLS_PYTHONPATH) $(PYTHON) tools/compile_content.py --check; \
-	else echo "test-content: no content compiler yet"; fi
+test-content: $(GENERATED_HEADER)
+	@PYTHONPATH=$(KILIX_GAME_TOOLS_PYTHONPATH) $(PYTHON) tools/check_care_schedule.py
+	@PYTHONPATH=$(KILIX_GAME_TOOLS_PYTHONPATH) $(PYTHON) tools/compile_content.py \
+		--out $(GENERATED_HEADER) --check
+	@PYTHONPATH=$(KILIX_GAME_TOOLS_PYTHONPATH) $(PYTHON) tests/test_content.py
+	@$(MAKE) --no-print-directory generated-check
+	@echo "test-content: PASS"
 
-generated-check:
-	@echo "generated-check: pending Milestone 3"
+# Recompile into a temporary directory and cmp, so a hand-edited generated
+# header fails the build rather than silently disagreeing with content/.
+generated-check: $(GENERATED_HEADER)
+	@dir=$$(mktemp -d); \
+	$(PYTHON) tools/compile_content.py --out $$dir/pg_content_generated.h >/dev/null; \
+	cmp $$dir/pg_content_generated.h $(GENERATED_HEADER); rc=$$?; \
+	rm -rf $$dir; \
+	test $$rc -eq 0 || { echo "generated-check: header does not match content/" >&2; exit 1; }
+	@echo "generated-check: PASS"
 
 test-assets:
 	@if [ -s assets/graphics/manifest.json ]; then \
