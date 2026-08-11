@@ -58,8 +58,20 @@ def load_entries(root: pathlib.Path) -> list[dict]:
     return sorted(entries, key=order)
 
 
+def target_for(entry: dict, out: pathlib.Path) -> pathlib.Path:
+    """Where this generation lands, taken from the ledger's own master path.
+
+    It used to be `<id>-chroma.png` for everything, which is right for the
+    plant strips and wrong for the rest: a background is not chroma-keyed and
+    belongs at backgrounds/<scene>/<scene>.png, and the sheets have their own
+    names. The ledger already says where each master goes -- ignoring that
+    field and reconstructing a name is how the two drift apart.
+    """
+    return out / pathlib.PurePosixPath(str(entry["master"])).name
+
+
 def generate(entry: dict, out: pathlib.Path, timeout: int) -> str:
-    target = out / f"{entry['id']}-chroma.png"
+    target = target_for(entry, out)
     if target.exists():
         return "skip"
     width, _, height = entry["canvas"].partition("x")
