@@ -40,10 +40,22 @@ def load_entries(root: pathlib.Path) -> list[dict]:
     entries = json.loads(ledger.read_text()).get("entries", [])
     if not entries:
         raise SystemExit("gen-masters: prompts.json has no entries")
-    # Healthy first within each species: it is the reference the rest are
-    # generated against.
-    return sorted(entries, key=lambda e: (e["species"],
-                                          HEALTH_ORDER.index(e["health"])))
+    # Healthy first within each species, because that strip is the reference
+    # the rest are generated against. Entries that are not plant strips -- the
+    # pot and tool sheets, the six backgrounds, the title -- have no species or
+    # health at all, and an earlier version of this sort assumed they did and
+    # crashed the moment the ledger grew past the plant rows.
+    def order(entry: dict) -> tuple:
+        kind = entry.get("kind", "")
+        species = entry.get("species", "~")
+        health = entry.get("health", "")
+        rank = (HEALTH_ORDER.index(health) if health in HEALTH_ORDER
+                else len(HEALTH_ORDER))
+        # plant strips, then specials, then sheets and backgrounds
+        group = 0 if kind == "plant-growth-strip" else 1
+        return (group, species, rank, entry["id"])
+
+    return sorted(entries, key=order)
 
 
 def generate(entry: dict, out: pathlib.Path, timeout: int) -> str:
@@ -89,7 +101,7 @@ def main(argv: list[str]) -> int:
 
     entries = load_entries(root)
     if args.anchors:
-        entries = [e for e in entries if e["health"] == "healthy"]
+        entries = [e for e in entries if e.get("health") == "healthy"]
     if args.only:
         entries = [e for e in entries if e["id"] == args.only]
         if not entries:
