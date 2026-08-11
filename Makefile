@@ -57,7 +57,11 @@ LDLIBS  ?= $(KILIX_ASSETS_LDLIBS) $(KILIX_GAME_KIT_LDLIBS)
 GENERATED_HEADER := $(BUILD)/pg_content_generated.h
 CONTENT_JSON := $(wildcard content/*.json)
 
-CORE_SRC := $(filter-out src/main.c src/pg_term.c,$(wildcard src/*.c))
+# pg_render_test.c is a harness, not core: it is linked into the standalone
+# binary only, so the archive kilix-land embeds does not pull in the kit's
+# test library.
+CORE_SRC := $(filter-out src/main.c src/pg_term.c src/pg_render_test.c,$(wildcard src/*.c))
+KILIX_GAME_KIT_TEST_LIB := $(KILIX_GAME_KIT_BUILD_DIR)/libkilix-game-test.a
 CORE_OBJ := $(patsubst src/%.c,$(BUILD)/obj/%.o,$(CORE_SRC))
 VENDOR_OBJ := $(BUILD)/obj/chip_sequencer.o
 PG_LIB   := $(BUILD)/libpleb-plant-grower.a
@@ -84,7 +88,8 @@ ORIG_SKIP     := --exclude-dir=fixtures
 # line of the Makefile is still scanned.
 ORIG_SELF     := ^Makefile:[0-9]+:ORIG_[A-Z_]+ +:=
 
-.PHONY: all test test-cli test-unit test-headless test-render test-content \
+.PHONY: all test test-cli test-unit test-noalloc test-headless test-render \
+        test-content \
         generated-check test-assets test-backgrounds test-art-review test-save \
         embed-guard check-release-tree originality art sfx check-sfx sanitize \
         test-clang test-shared install uninstall release-gate dist clean
@@ -120,13 +125,19 @@ $(BUILD)/obj/pg_term.o:   $(KITTY_INPUT_DIR)/include/kitty_input.h \
 $(PG_LIB): $(CORE_OBJ) $(VENDOR_OBJ) | $(BUILD)
 	ar rcs $@ $(CORE_OBJ) $(VENDOR_OBJ)
 
-$(BIN): $(BUILD)/obj/main.o $(BUILD)/obj/pg_term.o $(CORE_OBJ) $(VENDOR_OBJ) $(APP_LIBS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(BUILD)/obj/main.o $(BUILD)/obj/pg_term.o \
-		$(CORE_OBJ) $(VENDOR_OBJ) $(APP_LIBS) $(LDLIBS)
+$(KILIX_GAME_KIT_TEST_LIB): $(KILIX_GAME_KIT_LIB)
+	@$(MAKE) --no-print-directory -C $(KILIX_GAME_KIT_DIR) \
+		BUILD_DIR=$(KILIX_GAME_KIT_BUILD_DIR) $@
 
-test: test-cli test-unit test-headless test-content test-assets \
-      test-backgrounds test-art-review test-save embed-guard originality \
-      check-release-tree
+$(BIN): $(BUILD)/obj/main.o $(BUILD)/obj/pg_term.o $(BUILD)/obj/pg_render_test.o \
+        $(CORE_OBJ) $(VENDOR_OBJ) $(APP_LIBS) $(KILIX_GAME_KIT_TEST_LIB)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(BUILD)/obj/main.o $(BUILD)/obj/pg_term.o \
+		$(BUILD)/obj/pg_render_test.o \
+		$(CORE_OBJ) $(VENDOR_OBJ) $(APP_LIBS) $(KILIX_GAME_KIT_TEST_LIB) $(LDLIBS)
+
+test: test-cli test-unit test-noalloc test-headless test-render test-content \
+      test-assets test-backgrounds test-art-review test-save embed-guard \
+      originality check-release-tree
 
 test-cli: $(BIN)
 	@./$(BIN) --version >/dev/null
@@ -140,7 +151,9 @@ test-cli: $(BIN)
 test-unit: $(PG_LIB) | $(BUILD)/tests
 	@set -e; found=0; \
 	for t in tests/test_*.c; do \
-		[ -e "$$t" ] || continue; found=1; \
+		[ -e "$$t" ] || continue; \
+		case "$$t" in tests/test_noalloc.c) continue;; esac; \
+		found=1; \
 		out=$(BUILD)/tests/$$(basename $$t .c); \
 		$(CC) $(CPPFLAGS) $(CFLAGS) $$t $(PG_LIB) $(APP_LIBS) $(LDLIBS) -o $$out; \
 		$$out; \
@@ -158,6 +171,14 @@ test-headless: $(BIN)
 	./$(BIN) --selftest 1337 400 > $$dir/b.txt; \
 	cmp $$dir/a.txt $$dir/b.txt || { rm -rf $$dir; exit 1; }; \
 	rm -rf $$dir; echo "test-headless: PASS"
+
+# The no-allocation gate needs the wrap flags, so it cannot ride the generic
+# unit-test loop above.
+test-noalloc: $(PG_LIB) | $(BUILD)/tests
+	@$(CC) $(CPPFLAGS) $(CFLAGS) tests/test_noalloc.c $(PG_LIB) $(APP_LIBS) \
+		$(LDLIBS) -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free \
+		-o $(BUILD)/tests/test-noalloc
+	@$(BUILD)/tests/test-noalloc
 
 test-render: $(BIN)
 	@dir=$$(mktemp -d); ./$(BIN) --render-test 7 $$dir && \

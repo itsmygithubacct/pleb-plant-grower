@@ -29,7 +29,10 @@
 
 #include "pg_plant.h"
 #include "pg_rng.h"
+#include "pg_scene.h"
 #include "pg_time.h"
+
+#include "kilix_assets.h"
 
 /* pg_store holds its two generations and its settings record by value, so the
  * storage type must be complete here. Nothing else in the core includes it. */
@@ -183,6 +186,31 @@ const char *pg_journal_kind_line(uint8_t kind);
  * count, a growth stage). A reader that does not ask will print a health index
  * as a time of day. */
 bool pg_journal_detail_is_hour(uint8_t kind);
+
+/* ---- graphics ------------------------------------------------------------
+ *
+ * The one place in the game that touches the filesystem outside pg_store
+ * (ARCHITECTURE.md §2.2 rule 6). Held by value like everything else: the
+ * plate's pixels are owned by kilix-assets, and nothing here is persisted.
+ *
+ * `scene` is an index into `scenes`, or PG_SCENE_NONE for background-off --
+ * which is the procedural stage of §4.3, NOT plain-studio. Those are two
+ * different looks and both ship. */
+#define PG_SCENE_NONE 0xffu
+
+struct pg_graphics {
+    pg_scene_desc scenes[PG_SCENE_COUNT];
+    uint8_t scene_count;
+    uint8_t scene;                  /* index, or PG_SCENE_NONE = off */
+    uint8_t loaded_count;           /* plates that resolved AND passed the gate */
+    bool full_frame_pending;        /* a scene swap must repaint everything */
+    kilix_asset_limits limits;
+    kilix_asset_locator locator;
+    char asset_root[512];
+    kilix_asset_image plate;        /* the current scene's backdrop */
+    kilix_asset_image front;        /* its optional RGBA occluder */
+    bool plate_valid, front_valid;
+};
 
 /* The event ring. Writing is append-only and wraps; reading hands back the
  * most recent entries oldest-first, which is the order the away report and the

@@ -15,6 +15,7 @@
 #include "pg_calendar.h"
 #include "pg_care.h"
 #include "pg_plant.h"
+#include "pg_render.h"
 #include "pg_save.h"
 #include "pg_sim.h"
 #include "pg_time.h"
@@ -32,6 +33,7 @@ static void usage(void)
     (void)puts("                         [--care-test] [--rules-test]");
     (void)puts("                         [--selftest [<seed> [<sim-days>]]]");
     (void)puts("                         [--save-test <dir>]");
+    (void)puts("                         [--render-test <seed> <dir>]");
     (void)puts("");
     (void)puts("A realtime houseplant you actually have to look after.");
     (void)puts("Runs standalone, or embedded in kilix-land.");
@@ -145,6 +147,21 @@ static int cmd_save_test(int extra, char **args)
     return pg_save_run_test(args[0]);
 }
 
+/* <seed> <dir>: both required, because a render fixture set that silently
+ * defaulted its directory would write into the working tree. */
+static int cmd_render_test(int extra, char **args)
+{
+    unsigned long long seed = 0ull;
+
+    (void)extra;
+    if (!parse_u64(args[0], UINT64_MAX, &seed)) {
+        (void)fprintf(stderr, "--render-test: seed '%s' is not a number\n",
+                      args[0]);
+        return 2;
+    }
+    return pg_render_run_test((uint64_t)seed, args[1]);
+}
+
 typedef struct pg_command {
     const char *name;
     int min_extra;
@@ -162,6 +179,7 @@ static const pg_command COMMANDS[] = {
     { "--rules-test",    0, 0, "",                        cmd_rules },
     { "--selftest",      0, 2, " [<seed> [<sim-days>]]",  cmd_selftest },
     { "--save-test",     1, 1, " <dir>",                  cmd_save_test },
+    { "--render-test",   2, 2, " <seed> <dir>",           cmd_render_test },
 };
 
 int main(int argc, char **argv)

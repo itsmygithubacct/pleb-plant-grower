@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "_purpose": "Cosmetic scene descriptors (ARCHITECTURE.md §4.1). A scene NEVER reaches the simulation (D-041): light_from tints the render and nothing else, or a user-supplied background would change the care model. The spot is the simulation object, and `default` and `default_spot` are deliberately not paired by index (D-081).",
+  "default": "plain-studio",
+  "default_spot": "one-metre",
+  "list": [
+    {
+      "id": "plain-studio",
+      "name": "Plain Studio",
+      "anchor_nudge": {"x": 0, "y": 0},
+      "panel_side": "right",
+      "light_from": "front",
+      "ink": "#f2e9d8",
+      "ink_shadow": "#12100e",
+      "front_overlay": false
+    },
+    {
+      "id": "sunny-sill",
+      "name": "Sunny Sill",
+      "anchor_nudge": {"x": 0, "y": 0},
+      "panel_side": "right",
+      "light_from": "left",
+      "ink": "#f6efe0",
+      "ink_shadow": "#141109",
+      "front_overlay": true
+    },
+    {
+      "id": "bright-corner",
+      "name": "Bright Corner",
+      "anchor_nudge": {"x": 0, "y": 0},
+      "panel_side": "right",
+      "light_from": "left",
+      "ink": "#f2e9d8",
+      "ink_shadow": "#12100e",
+      "front_overlay": false
+    },
+    {
+      "id": "study-desk",
+      "name": "Study Desk",
+      "anchor_nudge": {"x": 0, "y": 0},
+      "panel_side": "left",
+      "light_from": "right",
+      "ink": "#ece3d2",
+      "ink_shadow": "#100e0c",
+      "front_overlay": true
+    },
+    {
+      "id": "kitchen-shelf",
+      "name": "Kitchen Shelf",
+      "anchor_nudge": {"x": 0, "y": 0},
+      "panel_side": "right",
+      "light_from": "right",
+      "ink": "#f4ecdc",
+      "ink_shadow": "#11100d",
+      "front_overlay": false
+    },
+    {
+      "id": "steamy-bath",
+      "name": "Steamy Bath",
+      "anchor_nudge": {"x": 0, "y": 0},
+      "panel_side": "left",
+      "light_from": "front",
+      "ink": "#eef0ea",
+      "ink_shadow": "#0e1211",
+      "front_overlay": true
+    }
+  ]
+}
