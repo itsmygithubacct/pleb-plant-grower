@@ -349,6 +349,60 @@ def build_atlas(species: str, source: pathlib.Path,
     return target, hashlib.sha256(data).hexdigest()
 
 
+# The three non-plant sheets. Each arrives as a 4x4 grid on a 1254x1254 canvas
+# and becomes a runtime atlas with its own cell size, which is why they cannot
+# share the plant path: a pot cell is 176x96 and a tool cell is 64x64, and both
+# are wrong for the other.
+SHEETS = {
+    "pots":   {"columns": 4, "rows": 4, "cell": (176, 96),  "key": (255, 0, 255)},
+    "tools":  {"columns": 4, "rows": 4, "cell": (64, 64),   "key": (255, 0, 255)},
+    "decals": {"columns": 4, "rows": 4, "cell": (64, 64),   "key": (255, 0, 255)},
+}
+
+
+def build_sheet(name: str, source: pathlib.Path,
+                out: pathlib.Path) -> tuple[pathlib.Path, str]:
+    spec = SHEETS[name]
+    cell_w, cell_h = spec["cell"]
+    columns, rows = spec["columns"], spec["rows"]
+    master = source / f"{name}-chroma.png"
+    if not master.is_file():
+        raise SystemExit(f"prepare-graphics: missing master {master}")
+
+    width, height, _channels, pixels = read_png(master)
+    key_and_despill(width, height, pixels, spec["key"])
+    contract_edges(width, height, pixels)
+
+    atlas_w, atlas_h = cell_w * columns, cell_h * rows
+    atlas = bytearray(atlas_w * atlas_h * 4)
+    src_w, src_h = width // columns, height // rows
+    for row in range(rows):
+        for column in range(columns):
+            # Fixed quarters here, unlike the plant strips: these sheets are
+            # authored as a grid of isolated objects with real gutters, so a
+            # cell boundary does not cut through a neighbour. The plant strips
+            # needed gap-finding because four plants lean into each other.
+            cell = resample_cell(width, pixels, column * src_w, row * src_h,
+                                 src_w, src_h, max(cell_w, cell_h))
+            size = max(cell_w, cell_h)
+            for y in range(cell_h):
+                sy = y + (size - cell_h) // 2
+                if sy < 0 or sy >= size:
+                    continue
+                for x in range(cell_w):
+                    sx = x + (size - cell_w) // 2
+                    if sx < 0 or sx >= size:
+                        continue
+                    dst = ((row * cell_h + y) * atlas_w
+                           + column * cell_w + x) * 4
+                    src = (sy * size + sx) * 4
+                    atlas[dst:dst + 4] = cell[src:src + 4]
+
+    target = out / f"{name}.png"
+    data = write_png(target, atlas_w, atlas_h, atlas)
+    return target, hashlib.sha256(data).hexdigest()
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=pathlib.Path,
@@ -356,6 +410,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", type=pathlib.Path,
                         default=pathlib.Path("assets/graphics/atlases"))
     parser.add_argument("--species", action="append")
+    parser.add_argument("--sheet", action="append",
+                        choices=sorted(SHEETS), help="pots, tools or decals")
     parser.add_argument("--check", action="store_true",
                         help="verify the built atlases match their masters "
                              "rather than rewriting them")
@@ -428,6 +484,17 @@ def main(argv: list[str]) -> int:
         return 0
 
     results = {}
+    for sheet in (args.sheet or []):
+        target, digest = build_sheet(sheet, source, out)
+        results[sheet] = digest
+        spec = SHEETS[sheet]
+        print(f"prepare-graphics: {target.name} "
+              f"{spec['cell'][0]*spec['columns']}x"
+              f"{spec['cell'][1]*spec['rows']} {digest[:16]}")
+    if args.sheet and not args.species:
+        print(json.dumps(results, indent=2))
+        return 0
+
     for species in wanted:
         if species not in SPECIES:
             raise SystemExit(f"prepare-graphics: unknown species {species}")
