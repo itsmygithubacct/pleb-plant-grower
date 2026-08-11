@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Release-tree hygiene.
+
+Compares what is on disk against what git tracks — deliberately `find` versus
+`git ls-files`, never `git status`, because a .gitignore entry hides a file
+from status while leaving it in the shipped tree.
+"""
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+FORBIDDEN_SUFFIX = (".pyc", ".o", ".a", ".core")
+FORBIDDEN_NAME = ("core", "__pycache__")
+FORBIDDEN_GLOB = ("render_*.ppm",)
+SKIP_DIRS = {".git", "build", "third_party"}
+# Build outputs that legitimately sit in the tree after `make` and are
+# legitimately untracked. Everything else untracked is a finding.
+SKIP_FILES = {"pleb-plant-grower"}
+
+
+def walk() -> list[Path]:
+    out = []
+    for p in ROOT.rglob("*"):
+        rel = p.relative_to(ROOT)
+        if any(part in SKIP_DIRS for part in rel.parts):
+            continue
+        if p.is_file() and str(rel) not in SKIP_FILES:
+            out.append(rel)
+    return out
+
+
+def main() -> int:
+    failures: list[str] = []
+    disk = walk()
+
+    for rel in disk:
+        if rel.suffix in FORBIDDEN_SUFFIX:
+            failures.append(f"build artefact in tree: {rel}")
+        if rel.name in FORBIDDEN_NAME:
+            failures.append(f"forbidden file: {rel}")
+        for pattern in FORBIDDEN_GLOB:
+            if rel.match(pattern):
+                failures.append(f"stray render output: {rel}")
+
+    tracked = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files"],
+        capture_output=True, text=True, check=False)
+    if tracked.returncode == 0:
+        tracked_set = {
+            Path(line) for line in tracked.stdout.splitlines() if line.strip()
+        }
+        untracked = [
+            r for r in disk
+            if r not in tracked_set and not any(
+                part in SKIP_DIRS for part in r.parts)
+        ]
+        for rel in sorted(untracked):
+            failures.append(f"present on disk but not tracked: {rel}")
+
+    if failures:
+        for f in failures:
+            print(f"release-tree: {f}", file=sys.stderr)
+        return 1
+    print("check-release-tree: PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

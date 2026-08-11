@@ -1,0 +1,8 @@
+build/
+pleb-plant-grower
+*.o
+*.a
+*.pyc
+__pycache__/
+core
+render_*.ppm

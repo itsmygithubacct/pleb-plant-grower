@@ -1,0 +1,23 @@
+name: test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - run: make CFLAGS="-O2 -Wall -Wextra -Wpedantic -Werror -std=c11"
+      - run: make test
+      - run: make sanitize
+      - run: make test-clang

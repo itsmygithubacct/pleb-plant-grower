@@ -1,0 +1,6 @@
+[submodule "third_party/kilix-game-sdk"]
+	path = third_party/kilix-game-sdk
+	url = https://github.com/itsmygithubacct/kilix-game-sdk.git
+[submodule "third_party/chip-sequencer"]
+	path = third_party/chip-sequencer
+	url = https://github.com/itsmygithubacct/chip-sequencer.git

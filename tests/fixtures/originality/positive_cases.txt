@@ -1,0 +1,5 @@
+scp art.png neon:~/art
+ssh user@neon
+neon.local
+/home/somebody/x
+someone@example.com
