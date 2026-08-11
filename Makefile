@@ -136,8 +136,8 @@ $(BIN): $(BUILD)/obj/main.o $(BUILD)/obj/pg_term.o $(BUILD)/obj/pg_render_test.o
 		$(CORE_OBJ) $(VENDOR_OBJ) $(APP_LIBS) $(KILIX_GAME_KIT_TEST_LIB) $(LDLIBS)
 
 test: test-cli test-unit test-noalloc test-headless test-render test-content \
-      test-assets test-backgrounds test-art-review test-save embed-guard \
-      originality check-release-tree
+      test-assets test-backgrounds test-art-review test-save check-sfx \
+      embed-guard originality check-release-tree
 
 test-cli: $(BIN)
 	@./$(BIN) --version >/dev/null
@@ -164,6 +164,7 @@ test-unit: $(PG_LIB) | $(BUILD)/tests
 test-headless: $(BIN)
 	@./$(BIN) --rules-test
 	@./$(BIN) --advice-test
+	@./$(BIN) --sound-test
 	@./$(BIN) --calendar-test
 	@./$(BIN) --care-test
 	@./$(BIN) --time-test

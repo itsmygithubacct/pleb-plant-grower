@@ -13,6 +13,7 @@
 #include "pleb_plant_grower.h"
 
 #include "pg_advice.h"
+#include "pg_audio.h"
 #include "pg_calendar.h"
 #include "pg_care.h"
 #include "pg_plant.h"
@@ -177,6 +178,151 @@ static int cmd_render_test(int extra, char **args)
     return pg_render_run_test((uint64_t)seed, args[1]);
 }
 
+/* ---- audio ---------------------------------------------------------------
+ *
+ * One cue per pg_audio_event_kind, loaded from the generated bank. require_mixer
+ * is false on purpose: a box with no sound sink still plays the game, because
+ * pcm-mixer degrades a dead sink to a silent no-op by design. A houseplant must
+ * not fail to open because pulseaudio is not running.
+ */
+#define PG_AUDIO_CUE_COUNT ((uint32_t)PG_AUDIO_KIND_COUNT)
+
+static kilix_game_audio_cue_spec PG_CUE_SPECS[PG_AUDIO_KIND_COUNT];
+static char PG_CUE_PATHS[PG_AUDIO_KIND_COUNT][48];
+
+static size_t build_cue_specs(void)
+{
+    size_t count = 0u;
+    uint32_t kind;
+
+    for (kind = 0u; kind < PG_AUDIO_CUE_COUNT; ++kind) {
+        const char *name = pg_audio_cue_name((uint8_t)kind);
+        if (name == NULL) continue;
+        (void)snprintf(PG_CUE_PATHS[count], sizeof PG_CUE_PATHS[count],
+                       "sfx/%s.wav", name);
+        PG_CUE_SPECS[count].cue = kind;
+        PG_CUE_SPECS[count].variant = 0u;
+        PG_CUE_SPECS[count].relative_path = PG_CUE_PATHS[count];
+        PG_CUE_SPECS[count].gain = 1.0f;
+        PG_CUE_SPECS[count].pitch = 1.0f;
+        /* Not required: a missing cue is silence, not a refusal to start. */
+        PG_CUE_SPECS[count].required = false;
+        count += 1u;
+    }
+    return count;
+}
+
+static bool audio_start(kilix_game_audio *audio, const char *asset_root,
+                        bool offline, char *error, size_t error_size)
+{
+    kilix_game_audio_options options;
+
+    kilix_game_audio_options_init(&options);
+    options.cue_count = PG_AUDIO_CUE_COUNT;
+    options.cues = PG_CUE_SPECS;
+    options.cue_spec_count = build_cue_specs();
+    options.data.environment_variable = "PLEB_PLANT_ASSETS";
+    options.data.local_root = asset_root;
+    options.data.installed_root = "../share/pleb-plant-grower/assets";
+    options.start_mixer = !offline;
+    options.require_mixer = false;
+    options.mixer.offline = offline;
+    return kilix_game_audio_init(audio, &options, error, error_size);
+}
+
+/* --sound-test: the bank loads, every cue resolves, and the whole thing works
+ * with no sink at all. Run under `PATH= ` it must still pass, which is the
+ * point -- this is the check that audio can never be the reason the game will
+ * not start. */
+static int cmd_sound_test(int extra, char **args)
+{
+    static kilix_game_audio audio;
+    char asset_root[1024];
+    size_t specs;
+    uint32_t kind;
+    char error[256];
+    int failures = 0;
+
+    (void)extra; (void)args;
+    if (!kilix_game_data_root_from_executable(
+            "PLEB_PLANT_ASSETS", "assets",
+            "../share/pleb-plant-grower/assets", asset_root,
+            sizeof asset_root)) {
+        asset_root[0] = '\0';
+    }
+    specs = build_cue_specs();
+    (void)printf("sound %s\n", pg_version());
+    (void)printf("  cues declared      %zu\n", specs);
+    if (specs != (size_t)PG_AUDIO_KIND_COUNT) {
+        (void)fprintf(stderr, "sound-test: a cue kind has no name\n");
+        failures += 1;
+    }
+    for (kind = 0u; kind < PG_AUDIO_CUE_COUNT; ++kind) {
+        if (pg_audio_cue_name((uint8_t)kind) == NULL) {
+            (void)fprintf(stderr, "sound-test: kind %u has no cue name\n",
+                          (unsigned)kind);
+            failures += 1;
+        }
+    }
+    /* Offline: deterministic, silent, and it exercises the same load path. */
+    memset(&audio, 0, sizeof audio);
+    if (!audio_start(&audio, asset_root, true, error, sizeof error)) {
+        (void)fprintf(stderr, "sound-test: audio would not initialise even "
+                              "offline (%s) -- audio must never block the "
+                              "game\n", error);
+        failures += 1;
+    } else {
+        (void)printf("  cues loaded        %zu\n", audio.loaded_cues);
+        (void)printf("  ready              %s\n",
+                     kilix_game_audio_is_ready(&audio) ? "yes" : "no");
+        for (kind = 0u; kind < PG_AUDIO_CUE_COUNT; ++kind) {
+            (void)kilix_game_audio_play(&audio, kind,
+                                        KILIX_GAME_AUDIO_BUS_SFX, 1.0f, 1.0f);
+        }
+        kilix_game_audio_update(&audio, 1.0f / 60.0f);
+        kilix_game_audio_shutdown(&audio);
+    }
+    /* The music scene selection is pure and must always answer. */
+    {
+        static pg_state state;
+        pg_init(&state, 7u);
+        if (pg_music_scene(&state) >= (uint32_t)PG_MUSIC_SCENE_COUNT) {
+            (void)fprintf(stderr, "sound-test: music scene out of range\n");
+            failures += 1;
+        }
+        if (pg_music_scene(NULL) >= (uint32_t)PG_MUSIC_SCENE_COUNT) {
+            (void)fprintf(stderr, "sound-test: NULL state has no scene\n");
+            failures += 1;
+        }
+    }
+    /* Take-and-clear: the queue empties and stays empty. */
+    {
+        static pg_state state;
+        pg_audio_event events[8];
+        size_t taken;
+        pg_init(&state, 8u);
+        pg_audio_push(&state, (uint8_t)PG_AUDIO_WATER, 1.0f, 1.0f);
+        pg_audio_push(&state, (uint8_t)PG_AUDIO_GROWTH, 1.0f, 1.0f);
+        taken = pg_take_audio_events(&state, events, 8u);
+        if (taken != 2u) {
+            (void)fprintf(stderr, "sound-test: took %zu events, expected 2\n",
+                          taken);
+            failures += 1;
+        }
+        if (pg_take_audio_events(&state, events, 8u) != 0u) {
+            (void)fprintf(stderr, "sound-test: the queue was not cleared\n");
+            failures += 1;
+        }
+    }
+    if (failures != 0) {
+        (void)fprintf(stderr, "sound-test: FAILED after %d failures\n",
+                      failures);
+        return 1;
+    }
+    (void)puts("sound: PASS");
+    return 0;
+}
+
 /* ---- the standalone game ------------------------------------------------
  *
  * kilix_game_host_run owns signals, the crash-time tty restore, headless,
@@ -192,7 +338,10 @@ typedef struct pg_app {
     pg_settings settings;
     pg_input input;
     ki_td_soft_renderer renderer;
+    kilix_game_audio audio;
     pg_render_result result;
+    uint32_t music_scene;
+    bool audio_open;
     int64_t last_advance_wall_s;
     uint64_t tick;
     bool store_open;
@@ -218,6 +367,11 @@ static bool app_start(kilix_game_host *host, void *user)
     }
     app->graphics_open = pg_graphics_init(&app->graphics, asset_root, error,
                                           sizeof error);
+    /* Audio never blocks the game: require_mixer is false and a failure here
+     * is silence, not an exit. */
+    app->audio_open = audio_start(&app->audio, asset_root, false, error,
+                                  sizeof error);
+    app->music_scene = (uint32_t)PG_MUSIC_SCENE_COUNT;
     app->store_open = pg_store_open(&app->store, NULL);
     if (app->store_open) {
         (void)pg_settings_load(&app->settings, &app->store);
@@ -274,6 +428,26 @@ static bool app_step(kilix_game_host *host, void *user, double step_seconds)
             app->last_advance_wall_s = now.wall_s;
         }
     }
+    /* Drain the core's events into the mixer. The core never touches a mixer;
+     * this is the whole of the boundary. */
+    if (app->audio_open) {
+        pg_audio_event events[PG_AUDIO_QUEUE_MAX];
+        size_t count = pg_take_audio_events(&app->state, events,
+                                            (size_t)PG_AUDIO_QUEUE_MAX);
+        size_t index;
+        uint32_t scene;
+        for (index = 0u; index < count; ++index) {
+            (void)kilix_game_audio_play(&app->audio, events[index].kind,
+                                        KILIX_GAME_AUDIO_BUS_SFX,
+                                        events[index].gain,
+                                        events[index].pitch);
+        }
+        scene = pg_music_scene(&app->state);
+        if (scene != app->music_scene) {
+            app->music_scene = scene;
+        }
+        kilix_game_audio_update(&app->audio, (float)step_seconds);
+    }
     app->tick += 1u;
     return true;
 }
@@ -321,6 +495,9 @@ static void app_stop(kilix_game_host *host, void *user)
         (void)pg_store_save(&app->state, &app->store);
         (void)pg_settings_save(&app->settings, &app->store);
         pg_store_close(&app->store);
+    }
+    if (app->audio_open) {
+        kilix_game_audio_shutdown(&app->audio);
     }
     if (app->graphics_open) {
         pg_graphics_shutdown(&app->graphics);
@@ -390,6 +567,7 @@ static const pg_command COMMANDS[] = {
     { "--save-test",     1, 1, " <dir>",                  cmd_save_test },
     { "--render-test",   2, 2, " <seed> <dir>",           cmd_render_test },
     { "--headless",      0, 1, " [<frames>]",             cmd_headless },
+    { "--sound-test",    0, 0, "",                        cmd_sound_test },
 };
 
 int main(int argc, char **argv)

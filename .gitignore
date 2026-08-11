@@ -6,3 +6,10 @@ pleb-plant-grower
 __pycache__/
 core
 render_*.ppm
+
+# The SFX bank is a build product: tools/gen_sfx.py regenerates it
+# byte-for-byte from integer arithmetic, and docs/audio-provenance.json
+# is the artifact of record that `make check-sfx` gates against. The
+# WAVs themselves would be 600 KB of binary that git cannot diff and
+# that the manifest already pins.
+assets/sfx/*.wav
