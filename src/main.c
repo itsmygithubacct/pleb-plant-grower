@@ -44,6 +44,7 @@ static void usage(void)
     (void)puts("                         [--save-test <dir>]");
     (void)puts("                         [--render-test <seed> <dir>]");
     (void)puts("                         [--headless [<frames>]]");
+    (void)puts("                         [--shot <dir>]");
     (void)puts("");
     (void)puts("A realtime houseplant you actually have to look after.");
     (void)puts("Runs standalone, or embedded in kilix-land.");
@@ -505,6 +506,129 @@ static void app_stop(kilix_game_host *host, void *user)
     ki_td_soft_renderer_destroy(&app->renderer);
 }
 
+
+/* RGBA framebuffer to binary PPM. Local rather than borrowed from the test
+ * kit: --shot ships in the game binary, and a release path should not depend
+ * on a test-only header. */
+static bool shot_write_ppm(const char *path, const uint8_t *rgba,
+                           int width, int height)
+{
+    FILE *file;
+    int y;
+
+    if (path == NULL || rgba == NULL || width <= 0 || height <= 0) {
+        return false;
+    }
+    file = fopen(path, "wb");
+    if (file == NULL) {
+        return false;
+    }
+    (void)fprintf(file, "P6\n%d %d\n255\n", width, height);
+    for (y = 0; y < height; ++y) {
+        int x;
+        for (x = 0; x < width; ++x) {
+            const uint8_t *px = rgba + ((size_t)y * (size_t)width
+                                        + (size_t)x) * 4u;
+            (void)fwrite(px, 1u, 3u, file);
+        }
+    }
+    return fclose(file) == 0;
+}
+
+/* --shot: render one frame per scene through the REAL asset root and write it
+ * out. This exists because --render-test cannot answer the question. That
+ * suite is hermetic on purpose -- it builds synthetic atlases so its 119
+ * fixtures hash the same on any machine -- with the consequence that nothing
+ * in the build ever drew the art the game actually ships. The suite hash was
+ * identical before and after six backdrop plates entered the tree, which is
+ * exactly the blind spot this closes. Determinism stays with --render-test;
+ * this is the eyes-on path. */
+static int cmd_shot(int extra, char **args)
+{
+    static pg_app app;
+    char asset_root[1024];
+    char error[256];
+    size_t scenes;
+    size_t index;
+    int written = 0;
+
+    (void)extra;
+    if (args[0][0] != '/') {
+        (void)fprintf(stderr, "--shot: <dir> must be an absolute path\n");
+        return 2;
+    }
+    memset(&app, 0, sizeof app);
+    pg_init(&app.state, 20260811u);
+    if (!kilix_game_data_root_from_executable(
+            "PLEB_PLANT_ASSETS", "assets",
+            "../share/pleb-plant-grower/assets", asset_root,
+            sizeof asset_root)) {
+        asset_root[0] = '\0';
+    }
+    if (!pg_graphics_init(&app.graphics, asset_root, error, sizeof error)) {
+        (void)fprintf(stderr, "--shot: graphics: %s\n", error);
+        return 1;
+    }
+    if (!ki_td_soft_renderer_init(&app.renderer, PG_LOGICAL_WIDTH * 2,
+                                  PG_LOGICAL_HEIGHT * 2)) {
+        (void)fprintf(stderr, "--shot: renderer\n");
+        pg_graphics_shutdown(&app.graphics);
+        return 1;
+    }
+    /* Say which overlay sheets loaded. They are indexed by their own
+     * meaning rather than by (stage, health), so a silent miss would look
+     * like a plant that simply has no bloom yet. */
+    {
+        static const char *const names[PG_OVERLAY_COUNT] = {
+            "spathe", "vines", "calathea-night"
+        };
+        size_t which;
+        for (which = 0u; which < (size_t)PG_OVERLAY_COUNT; ++which) {
+            (void)printf("overlay %-15s %s\n", names[which],
+                         app.graphics.overlay_valid[which] ? "loaded"
+                                                           : "ABSENT");
+        }
+    }
+    scenes = pg_graphics_scene_count(&app.graphics);
+    for (index = 0u; index <= scenes; ++index) {
+        /* index == scenes is the scene-off case, which the owner's brief
+         * called for explicitly: the backdrop must be disable-able. */
+        const char *id = index < scenes
+                       ? pg_graphics_scene_id(&app.graphics, index) : NULL;
+        char path[1200];
+        const uint8_t *rgba;
+
+        if (!pg_graphics_set_scene(&app.graphics, id) && id != NULL) {
+            (void)fprintf(stderr, "--shot: scene %s did not load\n", id);
+            continue;
+        }
+        if (!pg_render(&app.renderer, &app.state, &app.graphics,
+                       &app.result)) {
+            (void)fprintf(stderr, "--shot: render failed for %s\n",
+                          id != NULL ? id : "scene-off");
+            continue;
+        }
+        rgba = ki_td_soft_pack_rgba(&app.renderer);
+        if (rgba == NULL) {
+            continue;
+        }
+        if (snprintf(path, sizeof path, "%s/%s.ppm", args[0],
+                     id != NULL ? id : "scene-off") >= (int)sizeof path) {
+            continue;
+        }
+        if (shot_write_ppm(path, rgba, ki_td_soft_width(&app.renderer),
+                           ki_td_soft_height(&app.renderer))) {
+            written += 1;
+            (void)printf("shot %s\n", id != NULL ? id : "scene-off");
+        }
+    }
+    ki_td_soft_renderer_destroy(&app.renderer);
+    pg_graphics_shutdown(&app.graphics);
+    (void)printf("--shot: %d frames from %s\n", written,
+                 asset_root[0] != '\0' ? asset_root : "(no asset root)");
+    return written > 0 ? 0 : 1;
+}
+
 static int run_game(bool headless, uint64_t max_frames)
 {
     static pg_app app;
@@ -567,6 +691,7 @@ static const pg_command COMMANDS[] = {
     { "--save-test",     1, 1, " <dir>",                  cmd_save_test },
     { "--render-test",   2, 2, " <seed> <dir>",           cmd_render_test },
     { "--headless",      0, 1, " [<frames>]",             cmd_headless },
+    { "--shot",          1, 1, " <dir>",                  cmd_shot },
     { "--sound-test",    0, 0, "",                        cmd_sound_test },
 };
 

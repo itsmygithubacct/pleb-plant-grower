@@ -204,6 +204,17 @@ bool pg_journal_detail_is_hour(uint8_t kind);
  * different looks and both ship. */
 #define PG_SCENE_NONE 0xffu
 
+/* Sheets that overlay a plant body rather than replace it. Kept separate from
+ * the species atlases because they are indexed by their own meaning, not by
+ * (growth stage, health): the spathe by bloom stage, the vine by segment, the
+ * night pose by growth stage alone. */
+typedef enum pg_overlay_atlas {
+    PG_OVERLAY_SPATHE = 0,
+    PG_OVERLAY_VINES = 1,
+    PG_OVERLAY_CALATHEA_NIGHT = 2,
+    PG_OVERLAY_COUNT = 3
+} pg_overlay_atlas;
+
 struct pg_graphics {
     pg_scene_desc scenes[PG_SCENE_COUNT];
     uint8_t scene_count;
@@ -229,6 +240,14 @@ struct pg_graphics {
     kilix_asset_atlas plant_grid[PG_SPECIES_COUNT];
     bool plant_atlas_valid[PG_SPECIES_COUNT];
     uint8_t plant_atlas_count;
+
+    /* Three sheets that are not a species body: the peace lily's spathe, the
+     * pothos trailer tiled downward, and the calathea's folded night pose.
+     * Same rule as the bodies -- a missing one falls back to the procedural
+     * draw rather than failing, so the game still opens with no art. */
+    kilix_asset_image overlay_atlas[PG_OVERLAY_COUNT];
+    kilix_asset_atlas overlay_grid[PG_OVERLAY_COUNT];
+    bool overlay_valid[PG_OVERLAY_COUNT];
 };
 
 /* The event ring. Writing is append-only and wraps; reading hands back the

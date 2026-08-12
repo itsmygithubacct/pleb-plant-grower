@@ -78,6 +78,48 @@
       "verdict": "accept",
       "reviewed": "2026-08-12",
       "note": "accepted by the owner after the tiled chain was rendered end to end. The art was always correct; the assembler was insetting every cell to its alpha bounding box and destroying the seams. All 12 segments now carry stems at both edges and every seam aligns at 0px offset. check_tiling enforces this from now on"
+    },
+    {
+      "path": "backgrounds/sunny-sill/sunny-sill.png",
+      "sha256": "75316668d0077198f2d7c76f82c7bf51db04a5c8925d61fb5e8431daa56ac4af",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- a bright windowsill: sash window, painted frame, books and a mug on a wood counter. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
+    },
+    {
+      "path": "backgrounds/bright-corner/bright-corner.png",
+      "sha256": "73345710552e2c9066ae59084d559a5badb18d4c97242c539cc546c585d95f90",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- a light corner of a room. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
+    },
+    {
+      "path": "backgrounds/study-desk/study-desk.png",
+      "sha256": "73d5c71cb9f65194b8b53d20c5ac13eda27a6dabbf81dff0b2b4be8ed66ffa75",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- a desk under a window. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
+    },
+    {
+      "path": "backgrounds/plain-studio/plain-studio.png",
+      "sha256": "61de81b23bae8d4377540a53a60e1a4cadd3f27c38ee535c319aa4e514e896ec",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- the neutral studio, the deliberately plain option. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
+    },
+    {
+      "path": "backgrounds/kitchen-shelf/kitchen-shelf.png",
+      "sha256": "bee3a9ae3846337c2da38519feb027aae853f010f2894d61455e38c602ad71a6",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- a kitchen shelf. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
+    },
+    {
+      "path": "backgrounds/steamy-bath/steamy-bath.png",
+      "sha256": "3a85405a4d94e1e1573bcdb980f578a7caedd42f26d8d6e2561b21f022a2fb1a",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- a tiled bathroom: green tile, towels, dispenser and soap dish. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
     }
   ]
 }

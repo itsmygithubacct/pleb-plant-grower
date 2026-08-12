@@ -267,6 +267,134 @@ static void draw_plant_body(ki_td_soft_renderer *renderer,
     (void)state;
 }
 
+
+/* ---- the three overlay sheets ------------------------------------------- */
+
+static bool overlay_cell(const pg_graphics *graphics, pg_overlay_atlas which,
+                         unsigned column, unsigned row, ki_td_rgba8 *sprite)
+{
+    kilix_asset_region cell;
+
+    if (graphics == NULL || !graphics->overlay_valid[which]) {
+        return false;
+    }
+    cell = kilix_asset_atlas_cell(&graphics->overlay_grid[which],
+                                  column, row);
+    if (!kilix_asset_region_is_valid(&cell)) {
+        return false;
+    }
+    *sprite = ki_td_rgba8_make(cell.pixels, (int)cell.width,
+                               (int)cell.height);
+    return true;
+}
+
+/* The peace lily's bloom, drawn from the sheet when it exists. The procedural
+ * ellipse in draw_plant_body stays as the fallback, so a missing sheet costs
+ * fidelity and not the feature. Row 0 is the fresh sequence, row 1 the spent
+ * one; the column is the bloom's own stage, which is why this sheet is not
+ * indexed like a species body. */
+static bool draw_spathe(ki_td_soft_renderer *renderer,
+                        const ki_td_view *view,
+                        const pg_graphics *graphics, const pg_plant *plant)
+{
+    ki_td_rgba8 sprite;
+    unsigned column;
+    unsigned row;
+
+    switch (plant->spathe_state) {
+    case (uint8_t)PG_SPATHE_BUDDING: column = 0u; row = 0u; break;
+    case (uint8_t)PG_SPATHE_OPEN:    column = 2u; row = 0u; break;
+    case (uint8_t)PG_SPATHE_FADING:  column = 1u; row = 1u; break;
+    default: return false;
+    }
+    if (!overlay_cell(graphics, PG_OVERLAY_SPATHE, column, row, &sprite)) {
+        return false;
+    }
+    ki_td_soft_rgba_pixel_art(renderer, view,
+                              (float)PG_POT_CX - (float)sprite.width * 0.5f
+                                  + 9.0f,
+                              (float)PG_POT_RIM_Y - (float)sprite.height
+                                  - 12.0f,
+                              &sprite, 1.0f);
+    return true;
+}
+
+/* The pothos trailer. ART_BIBLE makes vine length "a free realtime progress
+ * bar": segments tile downward from the rim, so how far the vine falls is the
+ * plant's growth rather than a number on the HUD. Row 1 is the yellowing set,
+ * chosen on health so a struggling pothos trails yellow. The last cell drawn
+ * is a tip, which is what stops the vine mid-air. */
+static void draw_vines(ki_td_soft_renderer *renderer, const ki_td_view *view,
+                       const pg_graphics *graphics, const pg_plant *plant)
+{
+    const unsigned SEGMENTS = 6u;
+    ki_td_rgba8 sprite;
+    unsigned row;
+    unsigned length;
+    unsigned index;
+    float x;
+    float y;
+
+    if (graphics == NULL || !graphics->overlay_valid[PG_OVERLAY_VINES]) {
+        return;
+    }
+    row = pg_plant_health(plant) >= (uint8_t)PG_HEALTH_THIRSTY ? 1u : 0u;
+    /* One segment per growth stage, so a seedling trails nothing and a
+     * specimen trails the full run. */
+    length = plant->growth_stage;
+    if (length == 0u) {
+        return;
+    }
+    if (length > SEGMENTS) {
+        length = SEGMENTS;
+    }
+    x = (float)PG_POT_CX - 24.0f - 18.0f;
+    y = (float)PG_POT_RIM_Y - 6.0f;
+    for (index = 0u; index < length; ++index) {
+        if (!overlay_cell(graphics, PG_OVERLAY_VINES, index % SEGMENTS, row,
+                          &sprite)) {
+            return;
+        }
+        ki_td_soft_rgba_pixel_art(renderer, view, x, y, &sprite, 1.0f);
+        y += (float)sprite.height;
+    }
+    /* Column 6 is the tip; it must end the vine rather than continue it. */
+    if (overlay_cell(graphics, PG_OVERLAY_VINES, 6u, row, &sprite)) {
+        ki_td_soft_rgba_pixel_art(renderer, view, x, y, &sprite, 1.0f);
+    }
+}
+
+/* The calathea folds its leaves upright after dark -- nyctinasty, the reason
+ * it is called a prayer plant. That is a time-of-day pose, not a health
+ * state, which is why this sheet is one row indexed by growth stage and why
+ * it replaces the body rather than layering over it. */
+static bool draw_calathea_night(ki_td_soft_renderer *renderer,
+                                const ki_td_view *view,
+                                const pg_graphics *graphics,
+                                const pg_plant *plant,
+                                const pg_care_env *env)
+{
+    ki_td_rgba8 sprite;
+    unsigned stage;
+
+    if (env->is_daylight || plant->species_id != (uint8_t)PG_SPECIES_CALATHEA
+        || plant->life_state == (uint8_t)PG_LIFE_DEAD) {
+        return false;
+    }
+    stage = plant->growth_stage < (uint8_t)PG_STAGE_COUNT
+          ? plant->growth_stage : (unsigned)PG_STAGE_COUNT - 1u;
+    if (!overlay_cell(graphics, PG_OVERLAY_CALATHEA_NIGHT, stage, 0u,
+                      &sprite)) {
+        return false;
+    }
+    ki_td_soft_rgba_pixel_art(renderer, view,
+                              (float)PG_POT_CX - (float)sprite.width * 0.5f,
+                              (float)PG_POT_RIM_Y - (float)sprite.height
+                                  + 8.0f,
+                              &sprite, 1.0f);
+    return true;
+}
+
 /* Layer 2, the authored path. Returns false when this species has no atlas,
  * which is how the caller knows to draw the procedural plant instead. */
 static bool draw_plant_atlas(ki_td_soft_renderer *renderer,
@@ -535,10 +663,22 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
          * because it interpolates between the six authored rows rather than
          * replacing them, and the decals and posture channels still apply on
          * top -- an atlas cell is the silhouette, not the whole readout. */
-        if (!draw_plant_atlas(renderer, &view, graphics, plant, light)) {
-            draw_plant_body(renderer, &view, state, plant, &env, light);
-        } else {
-            draw_plant_decals(renderer, &view, plant, &env);
+        /* The night pose replaces the body outright -- a folded calathea is
+         * a different silhouette, not a tint over the open one. */
+        if (!draw_calathea_night(renderer, &view, graphics, plant, &env)) {
+            if (!draw_plant_atlas(renderer, &view, graphics, plant, light)) {
+                draw_plant_body(renderer, &view, state, plant, &env, light);
+            } else {
+                draw_plant_decals(renderer, &view, plant, &env);
+            }
+        }
+        /* Behind the pot, which is drawn next: a trailer falls in front of
+         * the rim it hangs over but behind the pot's own face. */
+        if (plant->species_id == (uint8_t)PG_SPECIES_POTHOS) {
+            draw_vines(renderer, &view, graphics, plant);
+        }
+        if (plant->species_id == (uint8_t)PG_SPECIES_PEACE_LILY) {
+            (void)draw_spathe(renderer, &view, graphics, plant);
         }
         /* Layer 4 -- in front of the stems, deliberately. */
         draw_pot(renderer, &view, plant);

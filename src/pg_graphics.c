@@ -145,6 +145,58 @@ static const char *const PG_ATLAS_FILES[PG_SPECIES_COUNT] = {
     "pothos", "snake-plant", "peace-lily", "calathea"
 };
 
+/* file, columns, rows, cell width, cell height. Exact size or nothing, the
+ * same contract the species atlases hold: a mis-sized sheet slices at the
+ * wrong offsets, and half a leaf is worse than no leaf. */
+static const struct pg_overlay_spec {
+    const char *file;
+    unsigned columns;
+    unsigned rows;
+    unsigned cell_w;
+    unsigned cell_h;
+} PG_OVERLAY_SPECS[PG_OVERLAY_COUNT] = {
+    { "spathe",         4u, 2u,  64u,  64u },
+    { "vines",          8u, 2u,  48u,  48u },
+    { "calathea-night", 4u, 1u, 160u, 160u }
+};
+
+static void load_overlay_atlases(pg_graphics *graphics)
+{
+    size_t index;
+
+    for (index = 0u; index < (size_t)PG_OVERLAY_COUNT; ++index) {
+        const struct pg_overlay_spec *spec = &PG_OVERLAY_SPECS[index];
+        char relative[128];
+        char resolved[512];
+        kilix_asset_image *image = &graphics->overlay_atlas[index];
+        int written = snprintf(relative, sizeof relative,
+                               "graphics/atlases/%s.png", spec->file);
+
+        graphics->overlay_valid[index] = false;
+        kilix_asset_image_clear(image);
+        if (written <= 0 || (size_t)written >= sizeof relative ||
+            !kilix_asset_path_is_safe(relative)) {
+            continue;
+        }
+        if (kilix_asset_resolve(&graphics->locator, relative, resolved,
+                                sizeof resolved) != KILIX_ASSET_OK) {
+            continue;
+        }
+        if (kilix_asset_image_load_png(image, resolved, &graphics->limits)
+            != KILIX_ASSET_OK) {
+            continue;
+        }
+        if (image->width != spec->columns * spec->cell_w ||
+            image->height != spec->rows * spec->cell_h ||
+            !kilix_asset_atlas_init_grid(&graphics->overlay_grid[index],
+                                         image, spec->columns, spec->rows)) {
+            kilix_asset_image_clear(image);
+            continue;
+        }
+        graphics->overlay_valid[index] = true;
+    }
+}
+
 #define PG_ATLAS_COLUMNS 4u
 #define PG_ATLAS_ROWS 6u
 #define PG_ATLAS_CELL 160u
@@ -255,6 +307,7 @@ bool pg_graphics_init(pg_graphics *graphics, const char *asset_root,
     }
 
     load_plant_atlases(graphics);
+    load_overlay_atlases(graphics);
 
     graphics->scene = PG_SCENE_NONE;
     graphics->full_frame_pending = true;

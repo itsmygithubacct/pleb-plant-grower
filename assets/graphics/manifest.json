@@ -240,6 +240,60 @@
         "source/vines-chroma.png"
       ],
       "sha256": "fa264813577449ffa180e7e9cfbe3690a56793f87bf231066472464d16b814d8"
+    },
+    {
+      "path": "backgrounds/sunny-sill/sunny-sill.png",
+      "kind": "backdrop-plate",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": false,
+      "sha256": "75316668d0077198f2d7c76f82c7bf51db04a5c8925d61fb5e8431daa56ac4af",
+      "masters": []
+    },
+    {
+      "path": "backgrounds/bright-corner/bright-corner.png",
+      "kind": "backdrop-plate",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": false,
+      "sha256": "73345710552e2c9066ae59084d559a5badb18d4c97242c539cc546c585d95f90",
+      "masters": []
+    },
+    {
+      "path": "backgrounds/study-desk/study-desk.png",
+      "kind": "backdrop-plate",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": false,
+      "sha256": "73d5c71cb9f65194b8b53d20c5ac13eda27a6dabbf81dff0b2b4be8ed66ffa75",
+      "masters": []
+    },
+    {
+      "path": "backgrounds/plain-studio/plain-studio.png",
+      "kind": "backdrop-plate",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": false,
+      "sha256": "61de81b23bae8d4377540a53a60e1a4cadd3f27c38ee535c319aa4e514e896ec",
+      "masters": []
+    },
+    {
+      "path": "backgrounds/kitchen-shelf/kitchen-shelf.png",
+      "kind": "backdrop-plate",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": false,
+      "sha256": "bee3a9ae3846337c2da38519feb027aae853f010f2894d61455e38c602ad71a6",
+      "masters": []
+    },
+    {
+      "path": "backgrounds/steamy-bath/steamy-bath.png",
+      "kind": "backdrop-plate",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": false,
+      "sha256": "3a85405a4d94e1e1573bcdb980f578a7caedd42f26d8d6e2561b21f022a2fb1a",
+      "masters": []
     }
   ]
 }
