@@ -57,6 +57,27 @@
       "verdict": "accept",
       "reviewed": "2026-08-11",
       "note": "accepted by the owner after review of the 96-cell contact sheet and the full-resolution atlases"
+    },
+    {
+      "path": "atlases/calathea-night.png",
+      "sha256": "abc6217e713c78ebfea804013722d3887fb6f4fa9291ea6981b2cf32aec47e0d",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the four-stage strip was rendered at 2x on a transparency check: leaves folded upright for nyctinasty, purple undersides intact (the reason this species keys on cyan, not magenta)"
+    },
+    {
+      "path": "atlases/spathe.png",
+      "sha256": "12048fbcb7376dd29f5e8ce8b699611524568775ef4dede032b0a8352ec7adcc",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the fixed-quarter slicing bug was corrected. The stray sliver in r0c3 came from the quarter boundary cutting through the fourth object at x=940; gap-based segmentation removed it, and every cell is now a single connected blob. Cell 8's blunt green stem is the stage the prompt specifies -- 'an empty cut stem with no flower at all, trimmed flat at the top' -- not a defect"
+    },
+    {
+      "path": "atlases/vines.png",
+      "sha256": "fa264813577449ffa180e7e9cfbe3690a56793f87bf231066472464d16b814d8",
+      "verdict": "accept",
+      "reviewed": "2026-08-12",
+      "note": "accepted by the owner after the tiled chain was rendered end to end. The art was always correct; the assembler was insetting every cell to its alpha bounding box and destroying the seams. All 12 segments now carry stems at both edges and every seam aligns at 0px offset. check_tiling enforces this from now on"
     }
   ]
 }

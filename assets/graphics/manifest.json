@@ -128,6 +128,27 @@
       ]
     },
     {
+      "path": "atlases/calathea-night.png",
+      "kind": "plant-atlas",
+      "columns": 4,
+      "rows": 1,
+      "cell": 160,
+      "column_labels": [
+        "establishing",
+        "growing",
+        "mature",
+        "specimen"
+      ],
+      "row_labels": [
+        "nightfold"
+      ],
+      "alpha_required": true,
+      "sha256": "abc6217e713c78ebfea804013722d3887fb6f4fa9291ea6981b2cf32aec47e0d",
+      "masters": [
+        "source/calathea-night-chroma.png"
+      ]
+    },
+    {
       "path": "atlases/pots.png",
       "kind": "sheet-atlas",
       "columns": 4,
@@ -170,6 +191,55 @@
       "path": "bitmaps/title.png",
       "kind": "bitmap",
       "sha256": "81b5fcf41f44bdb277eac0d435037343a1f15095978cb2603159e16e2d85f864"
+    },
+    {
+      "path": "atlases/spathe.png",
+      "kind": "sheet",
+      "columns": 4,
+      "rows": 2,
+      "cell": 64,
+      "column_labels": [
+        "bud",
+        "opening",
+        "open",
+        "full"
+      ],
+      "row_labels": [
+        "fresh",
+        "spent"
+      ],
+      "alpha_required": true,
+      "masters": [
+        "source/spathe-chroma.png"
+      ],
+      "sha256": "12048fbcb7376dd29f5e8ce8b699611524568775ef4dede032b0a8352ec7adcc"
+    },
+    {
+      "path": "atlases/vines.png",
+      "kind": "sheet",
+      "columns": 8,
+      "rows": 2,
+      "cell": 48,
+      "column_labels": [
+        "seg-a",
+        "seg-b",
+        "seg-c",
+        "seg-d",
+        "seg-e",
+        "seg-f",
+        "tip",
+        "tip-alt"
+      ],
+      "row_labels": [
+        "healthy",
+        "yellowing"
+      ],
+      "tiles": true,
+      "alpha_required": true,
+      "masters": [
+        "source/vines-chroma.png"
+      ],
+      "sha256": "fa264813577449ffa180e7e9cfbe3690a56793f87bf231066472464d16b814d8"
     }
   ]
 }

@@ -168,7 +168,8 @@ def contract_edges(width: int, height: int, pixels: bytearray) -> None:
 
 
 def segment_columns(width: int, height: int, pixels: bytearray,
-                    count: int) -> list[tuple[int, int]]:
+                    count: int, y0: int = 0,
+                    y1: int | None = None) -> list[tuple[int, int]]:
     """Split a strip into `count` subjects by the empty columns between them.
 
     Slicing at fixed quarters is the obvious implementation and it is wrong:
@@ -182,7 +183,7 @@ def segment_columns(width: int, height: int, pixels: bytearray,
     sliver back.
     """
     occupied = bytearray(width)
-    for y in range(height):
+    for y in range(y0, height if y1 is None else y1):
         row = y * width
         for x in range(width):
             if pixels[(row + x) * 4 + 3]:
@@ -234,6 +235,48 @@ def alpha_bounds(src_w: int, pixels: bytearray, x0: int, y0: int,
     if right < 0:
         return None
     return x0 + left, y0 + top, right - left + 1, bottom - top + 1
+
+
+def resample_panel(src_w: int, pixels: bytearray, x0: int, y0: int,
+                   cw: int, chh: int, out_w: int, out_h: int) -> bytearray:
+    """Box-average a whole source panel into out_w x out_h.
+
+    The counterpart to resample_cell, and the difference is the entire point:
+    resample_cell fits the subject's alpha bounding box into the cell, which
+    is right for an object that sits on a ground line and fatal for one that
+    has to continue past its own edge. A vine segment is tiled head to tail,
+    so its stem must leave the top edge exactly where the next copy's stem
+    enters the bottom. Cropping to the bbox insets it and the chain breaks --
+    which is what happened, and it made every one of the sixteen cells empty
+    at both seams.
+    """
+    out = bytearray(out_w * out_h * 4)
+    for y in range(out_h):
+        sy0 = y0 + y * chh // out_h
+        sy1 = max(sy0 + 1, y0 + (y + 1) * chh // out_h)
+        for x in range(out_w):
+            sx0 = x0 + x * cw // out_w
+            sx1 = max(sx0 + 1, x0 + (x + 1) * cw // out_w)
+            r = g = b = a = n = 0
+            for sy in range(sy0, sy1):
+                row = sy * src_w
+                for sx in range(sx0, sx1):
+                    i = (row + sx) * 4
+                    alpha = pixels[i + 3]
+                    # weight colour by alpha so transparent pixels do not
+                    # drag a halo into the average (the leaf-halo bug)
+                    r += pixels[i] * alpha
+                    g += pixels[i + 1] * alpha
+                    b += pixels[i + 2] * alpha
+                    a += alpha
+                    n += 1
+            o = (y * out_w + x) * 4
+            if n and a:
+                out[o] = r // a
+                out[o + 1] = g // a
+                out[o + 2] = b // a
+                out[o + 3] = a // n
+    return out
 
 
 def resample_cell(src_w: int, pixels: bytearray, x0: int, y0: int,
@@ -357,7 +400,136 @@ SHEETS = {
     "pots":   {"columns": 4, "rows": 4, "cell": (176, 96),  "key": (255, 0, 255)},
     "tools":  {"columns": 4, "rows": 4, "cell": (64, 64),   "key": (255, 0, 255)},
     "decals": {"columns": 4, "rows": 4, "cell": (64, 64),   "key": (255, 0, 255)},
+    # The peace lily's spathe is drawn apart from its body so a bloom can be
+    # laid over any growth stage without reauthoring the plant; four stages
+    # across, open and spent down.
+    "spathe": {"columns": 4, "rows": 2, "cell": (64, 64),   "key": (255, 0, 255)},
+    # Pothos trailers. Eight lengths across, two rows so a pot can carry a
+    # long and a short vine without both sides matching.
+    "vines":  {"columns": 8, "rows": 2, "cell": (48, 48),   "key": (255, 0, 255),
+               "tile": True, "tips": 2},
 }
+
+
+# calathea-night is a plant strip with one row instead of six: the same four
+# growth stages, all at the nyctinastic fold, swapped in by the realtime clock
+# after dusk. It uses the strip path -- gap segmentation, alpha bounds, bottom
+# anchoring -- because it is a strip; only the row count differs.
+SPECIAL_STRIPS = {
+    "calathea-night": {"key": (0, 255, 255)},
+}
+
+
+def build_special(name: str, source: pathlib.Path,
+                  out: pathlib.Path) -> tuple[pathlib.Path, str]:
+    spec = SPECIAL_STRIPS[name]
+    master = source / f"{name}-chroma.png"
+    if not master.is_file():
+        raise SystemExit(f"prepare-graphics: missing master {master}")
+
+    width, height, _channels, pixels = read_png(master)
+    key_and_despill(width, height, pixels, spec["key"])
+    contract_edges(width, height, pixels)
+
+    atlas_w = CELL * COLUMNS
+    atlas = bytearray(atlas_w * CELL * 4)
+    spans = segment_columns(width, height, pixels, COLUMNS)
+    for column, (span_x, span_w) in enumerate(spans):
+        cell = resample_cell(width, pixels, span_x, 0, span_w, height, CELL)
+        for y in range(CELL):
+            dst = (y * atlas_w + column * CELL) * 4
+            src = y * CELL * 4
+            atlas[dst:dst + CELL * 4] = cell[src:src + CELL * 4]
+
+    target = out / f"{name}.png"
+    data = write_png(target, atlas_w, CELL, atlas)
+    return target, hashlib.sha256(data).hexdigest()
+
+
+def _rebuild_one(job: tuple) -> tuple:
+    """Rebuild one atlas in a worker process and return its digest.
+
+    Module level and picklable because it has to cross a process boundary.
+    """
+    kind, name, source, scratch = job
+    target = pathlib.Path(scratch) / kind / name
+    target.mkdir(parents=True, exist_ok=True)
+    try:
+        if kind == "sheet":
+            _, digest = build_sheet(name, pathlib.Path(source), target)
+        else:
+            _, digest = build_atlas(name, pathlib.Path(source), target)
+        return (kind, name, digest, None)
+    except SystemExit as error:
+        return (kind, name, None, str(error))
+
+
+def check_tiling(name: str, atlas: pathlib.Path) -> list[str]:
+    """Verify a tiling sheet actually chains, seam to seam.
+
+    ART_BIBLE states the vine segments are "tiled downward by the renderer so
+    vine length is a free realtime progress bar", and nothing enforced it. The
+    assembler was insetting every cell to its alpha bounding box, so all
+    sixteen cells were empty at both seams and no two segments could ever
+    join -- and the sheet still passed every check there was, because the only
+    question anyone asked was whether the bytes matched the master.
+
+    Two properties, both of which the broken sheet failed:
+      - a segment carries opaque pixels on its top AND bottom edge, so the
+        stem leaves the cell rather than stopping inside it;
+      - consecutive segments overlap in x at the shared seam, so the stem does
+        not jump sideways where they meet.
+
+    Tip cells are exempt from the second property and inverted on the first:
+    a tip must enter from the top and must NOT continue past the bottom, which
+    is what makes it a tip.
+    """
+    spec = SHEETS[name]
+    if not spec.get("tile"):
+        return []
+    cell_w, cell_h = spec["cell"]
+    columns, rows = spec["columns"], spec["rows"]
+    tips = spec.get("tips", 2)
+    segments = columns - tips
+    width, height, _channels, pixels = read_png(atlas)
+    if (width, height) != (cell_w * columns, cell_h * rows):
+        return [f"{name}: atlas is {width}x{height}, expected "
+                f"{cell_w * columns}x{cell_h * rows}"]
+
+    def edge(cx: int, cy: int, ry: int) -> list[int]:
+        base = (cy * cell_h + ry) * width
+        return [x for x in range(cell_w)
+                if pixels[(base + cx * cell_w + x) * 4 + 3] >= 128]
+
+    problems = []
+    for cy in range(rows):
+        for cx in range(columns):
+            top, bottom = edge(cx, cy, 0), edge(cx, cy, cell_h - 1)
+            if cx >= segments:
+                if not top:
+                    problems.append(
+                        f"{name}: tip r{cy}c{cx} has no stem entering its top "
+                        f"edge, so it cannot attach to a segment")
+                if bottom:
+                    problems.append(
+                        f"{name}: tip r{cy}c{cx} runs off its bottom edge; a "
+                        f"tip has to end the vine")
+                continue
+            if not top or not bottom:
+                where = "top" if not top else "bottom"
+                problems.append(
+                    f"{name}: segment r{cy}c{cx} is empty at its {where} "
+                    f"edge, so tiling it leaves a gap")
+                continue
+            if cx + 1 < segments:
+                nxt = edge(cx + 1, cy, 0)
+                if nxt and not (min(nxt) <= max(bottom)
+                                and min(bottom) <= max(nxt)):
+                    problems.append(
+                        f"{name}: segment r{cy}c{cx} leaves at x="
+                        f"{min(bottom)}-{max(bottom)} but r{cy}c{cx + 1} "
+                        f"enters at x={min(nxt)}-{max(nxt)}; the stem jumps")
+    return problems
 
 
 def build_sheet(name: str, source: pathlib.Path,
@@ -371,19 +543,53 @@ def build_sheet(name: str, source: pathlib.Path,
 
     width, height, _channels, pixels = read_png(master)
     key_and_despill(width, height, pixels, spec["key"])
-    contract_edges(width, height, pixels)
+    if not spec.get("tile"):
+        # contract_edges trims the ring just inside a key edge, which is what
+        # stops a sprite carrying an outline of its own key. On a tiling sheet
+        # that ring IS the seam, so trimming it guarantees the break this
+        # mode exists to avoid.
+        contract_edges(width, height, pixels)
 
     atlas_w, atlas_h = cell_w * columns, cell_h * rows
     atlas = bytearray(atlas_w * atlas_h * 4)
     src_w, src_h = width // columns, height // rows
+    # Fixed quarters were assumed safe here on the grounds that these sheets
+    # are grids of isolated objects with real gutters. That is not reliably
+    # true: the spathe master puts its fourth object across x=940, which is
+    # exactly where the fourth quarter cuts, so cell 3 kept a sliver of its
+    # neighbour and cell 4 lost its subject. Find the real gaps per row band,
+    # the same way the plant strips do.
+    #
+    # Tiling sheets are exempt by construction: their segments run edge to
+    # edge on purpose, so there are no gaps to find and quarters are correct.
+    row_spans = None
+    if not spec.get("tile"):
+        row_spans = [segment_columns(width, height, pixels, columns,
+                                     row * src_h, (row + 1) * src_h)
+                     for row in range(rows)]
     for row in range(rows):
         for column in range(columns):
             # Fixed quarters here, unlike the plant strips: these sheets are
             # authored as a grid of isolated objects with real gutters, so a
             # cell boundary does not cut through a neighbour. The plant strips
             # needed gap-finding because four plants lean into each other.
-            cell = resample_cell(width, pixels, column * src_w, row * src_h,
-                                 src_w, src_h, max(cell_w, cell_h))
+            if row_spans is not None:
+                start, span = row_spans[row][column]
+            else:
+                start, span = column * src_w, src_w
+            if spec.get("tile"):
+                panel = resample_panel(width, pixels,
+                                       start, row * src_h,
+                                       span, src_h, cell_w, cell_h)
+                for y in range(cell_h):
+                    dst = ((row * cell_h + y) * atlas_w
+                           + column * cell_w) * 4
+                    src = y * cell_w * 4
+                    atlas[dst:dst + cell_w * 4] = \
+                        panel[src:src + cell_w * 4]
+                continue
+            cell = resample_cell(width, pixels, start, row * src_h,
+                                 span, src_h, max(cell_w, cell_h))
             size = max(cell_w, cell_h)
             for y in range(cell_h):
                 sy = y + (size - cell_h) // 2
@@ -410,6 +616,9 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", type=pathlib.Path,
                         default=pathlib.Path("assets/graphics/atlases"))
     parser.add_argument("--species", action="append")
+    parser.add_argument("--special", action="append",
+                        choices=sorted(SPECIAL_STRIPS),
+                        help="calathea-night")
     parser.add_argument("--sheet", action="append",
                         choices=sorted(SHEETS), help="pots, tools or decals")
     parser.add_argument("--check", action="store_true",
@@ -459,30 +668,53 @@ def main(argv: list[str]) -> int:
     # can therefore never fail. It builds into a temporary directory now and
     # compares, leaving the tree untouched.
     if args.check:
+        import concurrent.futures
+        import os
         import tempfile
         failures = []
+        sheets_to_check = list(args.sheet or sheets_wanted)
+        # Rebuilding every atlas from its masters is the strong form of this
+        # check -- it catches an atlas edited by hand, which comparing the
+        # manifest hash to the file cannot. It is also minutes of pure-Python
+        # resampling, and a gate slow enough to skip is a gate nobody runs. The
+        # work is one independent rebuild per atlas, so it goes wide instead of
+        # being traded away for a weaker check.
+        jobs = ([("sheet", s, str(source), None) for s in sheets_to_check]
+                + [("species", s, str(source), None) for s in wanted])
         with tempfile.TemporaryDirectory() as scratch:
-            for sheet in (args.sheet or sheets_wanted if args.check else []):
+            jobs = [(k, n, s, scratch) for k, n, s, _ in jobs]
+            workers = max(1, min(len(jobs), (os.cpu_count() or 2) - 1))
+            digests = {}
+            with concurrent.futures.ProcessPoolExecutor(workers) as pool:
+                for kind, name, digest, error in pool.map(_rebuild_one, jobs):
+                    digests[(kind, name)] = (digest, error)
+            for sheet in sheets_to_check:
                 built = out / f"{sheet}.png"
                 if not built.is_file():
                     failures.append(f"{sheet}: no atlas; run make graphics")
                     continue
-                _, digest = build_sheet(sheet, source, pathlib.Path(scratch))
+                digest, error = digests[("sheet", sheet)]
+                if error:
+                    failures.append(f"{sheet}: {error}")
+                    continue
                 have = hashlib.sha256(built.read_bytes()).hexdigest()
                 if have != digest:
                     failures.append(
                         f"{sheet}: atlas drifted from its master\n"
                         f"    committed {have[:16]}\n"
                         f"    rebuilt   {digest[:16]}")
+                # Matching the master is not enough for a tiling sheet: the
+                # broken vines atlas matched its master exactly and still
+                # could not tile, because the fault was in the assembler that
+                # both sides of the comparison shared.
+                failures.extend(check_tiling(sheet, built))
             for species in wanted:
                 built = out / f"{species}.png"
                 if not built.is_file():
                     failures.append(f"{species}: no atlas; run make graphics")
                     continue
-                try:
-                    _, digest = build_atlas(species, source,
-                                            pathlib.Path(scratch))
-                except SystemExit as error:
+                digest, error = digests[("species", species)]
+                if error:
                     failures.append(f"{species}: {error}")
                     continue
                 have = hashlib.sha256(built.read_bytes()).hexdigest()
@@ -501,6 +733,11 @@ def main(argv: list[str]) -> int:
         return 0
 
     results = {}
+    for special in (args.special or []):
+        target, digest = build_special(special, source, out)
+        results[special] = digest
+        print(f"prepare-graphics: {target.name} {CELL*COLUMNS}x{CELL} "
+              f"{digest[:16]}")
     for sheet in (args.sheet or []):
         target, digest = build_sheet(sheet, source, out)
         results[sheet] = digest
@@ -508,7 +745,7 @@ def main(argv: list[str]) -> int:
         print(f"prepare-graphics: {target.name} "
               f"{spec['cell'][0]*spec['columns']}x"
               f"{spec['cell'][1]*spec['rows']} {digest[:16]}")
-    if args.sheet and not args.species:
+    if (args.sheet or args.special) and not args.species:
         print(json.dumps(results, indent=2))
         return 0
 

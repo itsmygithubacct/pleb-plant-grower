@@ -111,6 +111,10 @@ SHEET_BLOCKS = (
      "source/decals-chroma.png", "1254x1254"),
     ("title", "full-screen 16:9 title illustration",
      "bitmaps/title.png", "1672x941"),
+    ("spathe", "an eight-cell reference sheet of a single peace-lily flower",
+     "source/spathe-chroma.png", "1254x1254"),
+    ("vines", "a sixteen-cell tile sheet of trailing pothos vine segments",
+     "source/vines-chroma.png", "1254x1254"),
 )
 
 SCENES = (
