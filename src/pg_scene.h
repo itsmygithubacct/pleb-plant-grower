@@ -39,8 +39,18 @@
 #define PG_PANEL_X     330
 #define PG_HORIZON_Y   176
 
-/* A plate may be aligned but no plate may move the composite. */
-#define PG_ANCHOR_NUDGE_LIMIT 16
+/* A plate may be aligned but no plate may move the composite: the pot, the
+ * HUD and the calendar sit where layout.json puts them, and a scene only
+ * shifts the plant to meet the surface it drew.
+ *
+ * The limit was 16, on the assumption that every plate would be authored with
+ * its surface at PG_SURFACE_Y. None of the six were -- their surfaces land
+ * between logical 173 and 219 against a constant of 232 -- so the pot stood
+ * sunk into the cabinetry, by a different amount in every scene. The plates
+ * cover 1920x1080 exactly, with no crop headroom to realign them, so the
+ * choice was this number or regenerating all six to a fixed surface line.
+ * 64 covers the measured range; the invariant it protects is unchanged. */
+#define PG_ANCHOR_NUDGE_LIMIT 64
 
 #define PG_SCENE_ID_BYTES 24
 #define PG_SCENE_NAME_BYTES 32

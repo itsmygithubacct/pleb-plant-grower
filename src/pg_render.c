@@ -285,6 +285,9 @@ static bool overlay_cell(const pg_graphics *graphics, pg_overlay_atlas which,
     }
     *sprite = ki_td_rgba8_make(cell.pixels, (int)cell.width,
                                (int)cell.height);
+    /* A region is a window into the atlas, not a copy: without its stride the
+     * sprite walks the sheet a cell-width at a time and smears. */
+    sprite->stride = cell.stride;
     return true;
 }
 
@@ -470,6 +473,48 @@ static void draw_plant_decals(ki_td_soft_renderer *renderer,
 }
 
 /* ---- layer 4: the pot, in front ------------------------------------------ */
+/* Rows: 0 clean, 1 salt crust, 2 rootbound, 3 failing. Structural wear
+ * outranks the cosmetic crust -- a cracked pot that also has salt on it reads
+ * as cracked, not as salty. */
+#define PG_POT_SALT_VISIBLE 5000u
+
+static unsigned pot_wear_row(const pg_plant *plant)
+{
+    unsigned capacity = plant->root_capacity != 0u
+                      ? (unsigned)plant->root_capacity : 1u;
+    unsigned bound = (unsigned)plant->root_bound * 100u / capacity;
+
+    if (bound >= 100u) return 3u;
+    if (bound >= 80u) return 2u;
+    if ((unsigned)plant->salt >= PG_POT_SALT_VISIBLE) return 1u;
+    return 0u;
+}
+
+/* The authored pot. The sheet is four materials across by four wear states
+ * down, and it had been sitting in the tree unloaded while the pot was drawn
+ * as a tapered stack of rectangles. Returns false when the sheet is absent so
+ * the procedural pot still covers a build with no art. */
+static bool draw_pot_atlas(ki_td_soft_renderer *renderer,
+                           const ki_td_view *view,
+                           const pg_graphics *graphics,
+                           const pg_plant *plant)
+{
+    ki_td_rgba8 sprite;
+    unsigned column = plant->pot_id < 4u ? (unsigned)plant->pot_id : 0u;
+
+    if (!overlay_cell(graphics, PG_OVERLAY_POTS, column,
+                      pot_wear_row(plant), &sprite)) {
+        return false;
+    }
+    /* Bottom-anchored on the surface line, not centred on the pot box: the
+     * pot stands on the ground the scene drew. */
+    ki_td_soft_rgba_pixel_art(renderer, view,
+                              (float)PG_POT_CX - (float)sprite.width * 0.5f,
+                              (float)PG_SURFACE_Y - (float)sprite.height,
+                              &sprite, 1.0f);
+    return true;
+}
+
 static void draw_pot(ki_td_soft_renderer *renderer, const ki_td_view *view,
                      const pg_plant *plant)
 {
@@ -647,6 +692,32 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
     /* Layer 1. */
     draw_room_dressing(renderer, &view);
 
+    /* The plant composite meets the surface the scene drew.
+     *
+     * Every plate puts its counter or shelf at a different height, and the
+     * stage constants are one fixed set, so without this the pot stands sunk
+     * into the cabinetry -- by 13 logical pixels on the studio and 59 on the
+     * bright corner. The shift is applied to a COPY of the view, and only
+     * around the plant layers: the HUD, the calendar and the backdrop keep
+     * the real view, because a scene aligns the plant to itself and is not
+     * allowed to move the composite around it.
+     *
+     * view offsets are screen pixels, so the logical nudge scales. */
+    {
+        ki_td_view plant_view = view;
+        /* Only when a plate actually loaded. The nudge aligns the plant to a
+         * surface the SCENE drew, so with no plate there is no surface to
+         * meet and the procedural room's own PG_SURFACE_Y is already right.
+         * Applying it regardless also broke a real invariant the render
+         * suite checks: two scenes with the same light and panel side and no
+         * plate must be indistinguishable, and they stopped being so. */
+        bool aligned = scene != NULL && scene->plate_loaded;
+        int nudge_y = aligned ? pg_scene_clamp_nudge(scene->nudge_y) : 0;
+        int nudge_x = aligned ? pg_scene_clamp_nudge(scene->nudge_x) : 0;
+
+        plant_view.offset_x += (int)((float)nudge_x * view.scale);
+        plant_view.offset_y += (int)((float)nudge_y * view.scale);
+
     for (plant_index = 0u;
          plant_index < state->plant_count && plant_index < PG_PLANT_MAX;
          ++plant_index) {
@@ -665,27 +736,30 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
          * top -- an atlas cell is the silhouette, not the whole readout. */
         /* The night pose replaces the body outright -- a folded calathea is
          * a different silhouette, not a tint over the open one. */
-        if (!draw_calathea_night(renderer, &view, graphics, plant, &env)) {
-            if (!draw_plant_atlas(renderer, &view, graphics, plant, light)) {
-                draw_plant_body(renderer, &view, state, plant, &env, light);
+        if (!draw_calathea_night(renderer, &plant_view, graphics, plant, &env)) {
+            if (!draw_plant_atlas(renderer, &plant_view, graphics, plant, light)) {
+                draw_plant_body(renderer, &plant_view, state, plant, &env, light);
             } else {
-                draw_plant_decals(renderer, &view, plant, &env);
+                draw_plant_decals(renderer, &plant_view, plant, &env);
             }
         }
         /* Behind the pot, which is drawn next: a trailer falls in front of
          * the rim it hangs over but behind the pot's own face. */
         if (plant->species_id == (uint8_t)PG_SPECIES_POTHOS) {
-            draw_vines(renderer, &view, graphics, plant);
+            draw_vines(renderer, &plant_view, graphics, plant);
         }
         if (plant->species_id == (uint8_t)PG_SPECIES_PEACE_LILY) {
-            (void)draw_spathe(renderer, &view, graphics, plant);
+            (void)draw_spathe(renderer, &plant_view, graphics, plant);
         }
         /* Layer 4 -- in front of the stems, deliberately. */
-        draw_pot(renderer, &view, plant);
+        if (!draw_pot_atlas(renderer, &plant_view, graphics, plant)) {
+            draw_pot(renderer, &plant_view, plant);
+        }
         /* Layer 5. */
-        draw_soil_line(renderer, &view, plant);
+        draw_soil_line(renderer, &plant_view, plant);
         /* Layer 6. */
-        draw_overlays(renderer, &view, plant, &env);
+        draw_overlays(renderer, &plant_view, plant, &env);
+    }
     }
 
     /* Layer 7: the occluder, over everything the room owns. */

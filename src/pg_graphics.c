@@ -37,6 +37,7 @@
 typedef struct pg_scene_seed {
     const char *id;
     const char *name;
+    int16_t nudge_x, nudge_y;
     uint8_t panel_side;
     uint8_t light_from;
     uint32_t ink;
@@ -45,17 +46,17 @@ typedef struct pg_scene_seed {
 } pg_scene_seed;
 
 static const pg_scene_seed PG_SCENE_SEEDS[PG_SCENE_COUNT] = {
-    {"sunny-sill",    "Sunny Sill",    PG_PANEL_RIGHT, PG_LIGHT_FROM_LEFT,
+    {"sunny-sill",    "Sunny Sill", 0, -16,    PG_PANEL_RIGHT, PG_LIGHT_FROM_LEFT,
      UINT32_C(0xf6efe0), UINT32_C(0x141109), true},
-    {"bright-corner", "Bright Corner", PG_PANEL_RIGHT, PG_LIGHT_FROM_LEFT,
+    {"bright-corner", "Bright Corner", 0, -59, PG_PANEL_RIGHT, PG_LIGHT_FROM_LEFT,
      UINT32_C(0xf2e9d8), UINT32_C(0x12100e), false},
-    {"study-desk",    "Study Desk",    PG_PANEL_LEFT,  PG_LIGHT_FROM_RIGHT,
+    {"study-desk",    "Study Desk", 0, -17,    PG_PANEL_LEFT,  PG_LIGHT_FROM_RIGHT,
      UINT32_C(0xece3d2), UINT32_C(0x100e0c), true},
-    {"plain-studio",  "Plain Studio",  PG_PANEL_RIGHT, PG_LIGHT_FROM_FRONT,
+    {"plain-studio",  "Plain Studio", 0, -13,  PG_PANEL_RIGHT, PG_LIGHT_FROM_FRONT,
      UINT32_C(0xf2e9d8), UINT32_C(0x12100e), false},
-    {"kitchen-shelf", "Kitchen Shelf", PG_PANEL_RIGHT, PG_LIGHT_FROM_RIGHT,
+    {"kitchen-shelf", "Kitchen Shelf", 0, -43, PG_PANEL_RIGHT, PG_LIGHT_FROM_RIGHT,
      UINT32_C(0xf4ecdc), UINT32_C(0x11100d), false},
-    {"steamy-bath",   "Steamy Bath",   PG_PANEL_LEFT,  PG_LIGHT_FROM_FRONT,
+    {"steamy-bath",   "Steamy Bath", 0, -13,   PG_PANEL_LEFT,  PG_LIGHT_FROM_FRONT,
      UINT32_C(0xeef0ea), UINT32_C(0x0e1211), true}
 };
 
@@ -157,7 +158,9 @@ static const struct pg_overlay_spec {
 } PG_OVERLAY_SPECS[PG_OVERLAY_COUNT] = {
     { "spathe",         4u, 2u,  64u,  64u },
     { "vines",          8u, 2u,  48u,  48u },
-    { "calathea-night", 4u, 1u, 160u, 160u }
+    { "calathea-night", 4u, 1u, 160u, 160u },
+    /* Four pot materials across, four wear states down. */
+    { "pots",           4u, 4u, 176u,  96u }
 };
 
 static void load_overlay_atlases(pg_graphics *graphics)
@@ -277,8 +280,8 @@ bool pg_graphics_init(pg_graphics *graphics, const char *asset_root,
 
         copy_bounded(scene->id, sizeof scene->id, seed->id);
         copy_bounded(scene->name, sizeof scene->name, seed->name);
-        scene->nudge_x = 0;
-        scene->nudge_y = 0;
+        scene->nudge_x = (int16_t)pg_scene_clamp_nudge(seed->nudge_x);
+        scene->nudge_y = (int16_t)pg_scene_clamp_nudge(seed->nudge_y);
         scene->panel_side = seed->panel_side;
         scene->light_from = seed->light_from;
         scene->ink = seed->ink;

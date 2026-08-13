@@ -212,7 +212,8 @@ typedef enum pg_overlay_atlas {
     PG_OVERLAY_SPATHE = 0,
     PG_OVERLAY_VINES = 1,
     PG_OVERLAY_CALATHEA_NIGHT = 2,
-    PG_OVERLAY_COUNT = 3
+    PG_OVERLAY_POTS = 3,
+    PG_OVERLAY_COUNT = 4
 } pg_overlay_atlas;
 
 struct pg_graphics {

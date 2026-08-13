@@ -580,7 +580,7 @@ static int cmd_shot(int extra, char **args)
      * like a plant that simply has no bloom yet. */
     {
         static const char *const names[PG_OVERLAY_COUNT] = {
-            "spathe", "vines", "calathea-night"
+            "spathe", "vines", "calathea-night", "pots"
         };
         size_t which;
         for (which = 0u; which < (size_t)PG_OVERLAY_COUNT; ++which) {
