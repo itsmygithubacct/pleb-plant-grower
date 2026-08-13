@@ -351,8 +351,16 @@ static void draw_vines(ki_td_soft_renderer *renderer, const ki_td_view *view,
     if (length > SEGMENTS) {
         length = SEGMENTS;
     }
-    x = (float)PG_POT_CX - 24.0f - 18.0f;
-    y = (float)PG_POT_RIM_Y - 6.0f;
+    /* Drape it over the pot's left shoulder and down the outside.
+     *
+     * It used to start at the plant's rim in the middle of the pot column,
+     * which put every segment above the soil line behind the pot -- the pot
+     * is drawn in front, deliberately -- so the vine appeared to sprout from
+     * underneath the pot instead of hanging over its edge. The authored pot
+     * spans x=70..246, so the trailer sits just inside its left edge and
+     * starts below the rim lip. */
+    x = (float)PG_POT_CX - 84.0f;
+    y = (float)PG_SURFACE_Y - 84.0f;
     for (index = 0u; index < length; ++index) {
         if (!overlay_cell(graphics, PG_OVERLAY_VINES, index % SEGMENTS, row,
                           &sprite)) {
@@ -611,8 +619,15 @@ static void draw_room_dressing(ki_td_soft_renderer *renderer,
 }
 
 /* ---- layer 6: overlays --------------------------------------------------- */
+/* `view` is the real stage view and `plant_view` the scene-shifted one. The
+ * night wash covers the whole screen and must use the former: drawn through
+ * the shifted view it left an unwashed strip at the bottom exactly as wide as
+ * the scene's nudge. Everything else here hangs off the pot and uses the
+ * latter. */
 static void draw_overlays(ki_td_soft_renderer *renderer,
-                          const ki_td_view *view, const pg_plant *plant,
+                          const ki_td_view *view,
+                          const ki_td_view *plant_view,
+                          const pg_plant *plant,
                           const pg_care_env *env)
 {
     /* Night is a look, not a filter on the simulation: a cool wash after dusk
@@ -631,7 +646,7 @@ static void draw_overlays(ki_td_soft_renderer *renderer,
         int drop;
         for (drop = 0; drop < 3; ++drop) {
             float dx = (float)PG_POT_CX - 10.0f + (float)(drop * 10);
-            ki_td_soft_fill_rect(renderer, view, dx,
+            ki_td_soft_fill_rect(renderer, plant_view, dx,
                                  (float)PG_POT_RIM_Y - 6.0f - (float)drop,
                                  1.0f, 2.0f, UINT32_C(0x9fd0e8), 0.75f);
         }
@@ -743,11 +758,6 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
                 draw_plant_decals(renderer, &plant_view, plant, &env);
             }
         }
-        /* Behind the pot, which is drawn next: a trailer falls in front of
-         * the rim it hangs over but behind the pot's own face. */
-        if (plant->species_id == (uint8_t)PG_SPECIES_POTHOS) {
-            draw_vines(renderer, &plant_view, graphics, plant);
-        }
         if (plant->species_id == (uint8_t)PG_SPECIES_PEACE_LILY) {
             (void)draw_spathe(renderer, &plant_view, graphics, plant);
         }
@@ -755,10 +765,15 @@ bool pg_render(ki_td_soft_renderer *renderer, const pg_state *state,
         if (!draw_pot_atlas(renderer, &plant_view, graphics, plant)) {
             draw_pot(renderer, &plant_view, plant);
         }
+        /* In front of the pot: a trailer hangs down the OUTSIDE of the pot it
+         * grows in, so it occludes the pot rather than the other way round. */
+        if (plant->species_id == (uint8_t)PG_SPECIES_POTHOS) {
+            draw_vines(renderer, &plant_view, graphics, plant);
+        }
         /* Layer 5. */
         draw_soil_line(renderer, &plant_view, plant);
         /* Layer 6. */
-        draw_overlays(renderer, &plant_view, plant, &env);
+        draw_overlays(renderer, &view, &plant_view, plant, &env);
     }
     }
 

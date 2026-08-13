@@ -589,6 +589,71 @@ static int cmd_shot(int extra, char **args)
                                                            : "ABSENT");
         }
     }
+    /* Force the three overlay conditions and shoot each one.
+     *
+     * A fresh save is a young pothos in daylight, so the spathe, the vine and
+     * the night pose never fire and none of them had been seen drawing. That
+     * mattered: the helper they share shipped without carrying the region's
+     * stride, which drew every one of them as a smeared band, and the bug was
+     * only caught because the pot happened to use the same helper and the pot
+     * was on screen. "The atlas loaded" is not evidence that it draws. */
+    {
+        static const struct {
+            const char *name;
+            uint8_t species;
+            uint8_t stage;
+            uint8_t spathe;
+            bool night;
+        } STATES[] = {
+            { "state-vines",    (uint8_t)PG_SPECIES_POTHOS,     4u, 0u, false },
+            { "state-spathe",   (uint8_t)PG_SPECIES_PEACE_LILY, 3u,
+              (uint8_t)PG_SPATHE_OPEN, false },
+            { "state-night",    (uint8_t)PG_SPECIES_CALATHEA,   3u, 0u, true  }
+        };
+        size_t which;
+
+        (void)pg_graphics_set_scene(&app.graphics, "plain-studio");
+        for (which = 0u; which < sizeof STATES / sizeof STATES[0]; ++which) {
+            pg_plant *plant = &app.state.plants[0];
+            char path[1200];
+            const uint8_t *rgba;
+
+            plant->species_id = STATES[which].species;
+            plant->growth_stage = STATES[which].stage;
+            plant->spathe_state = STATES[which].spathe;
+            /* Walk the clock forward an hour at a time until the sim itself
+             * says it is night, rather than computing an offset and trusting
+             * it -- the first attempt subtracted its way to UTC noon and shot
+             * the day pose, which looked plausible enough to nearly pass. */
+            if (STATES[which].night) {
+                int tries;
+                for (tries = 0; tries < 24; ++tries) {
+                    if (!pg_sim_env_now(&app.state, 0u).is_daylight) break;
+                    app.state.anchor.last_wall_s += 3600;
+                }
+                if (pg_sim_env_now(&app.state, 0u).is_daylight) {
+                    (void)fprintf(stderr,
+                                  "--shot: could not reach night\n");
+                    continue;
+                }
+            }
+            if (!pg_render(&app.renderer, &app.state, &app.graphics,
+                           &app.result)) {
+                continue;
+            }
+            rgba = ki_td_soft_pack_rgba(&app.renderer);
+            if (rgba == NULL) continue;
+            if (snprintf(path, sizeof path, "%s/%s.ppm", args[0],
+                         STATES[which].name) >= (int)sizeof path) continue;
+            if (shot_write_ppm(path, rgba, ki_td_soft_width(&app.renderer),
+                               ki_td_soft_height(&app.renderer))) {
+                written += 1;
+                (void)printf("shot %s\n", STATES[which].name);
+            }
+        }
+        pg_init(&app.state, 20260811u);   /* leave the state as we found it */
+    }
+
     scenes = pg_graphics_scene_count(&app.graphics);
     for (index = 0u; index <= scenes; ++index) {
         /* index == scenes is the scene-off case, which the owner's brief
