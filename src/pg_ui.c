@@ -17,9 +17,40 @@
 #include <stdio.h>
 #include <string.h>
 
-/* The HUD column. panel_side mirrors it for scenes that put the plant on the
- * right, which is the whole reason that field exists. */
+/* The HUD column.
+ *
+ * panel_side was documented as existing "for scenes that put the plant on the
+ * right" -- but no scene can move the plant. PG_POT_CX is a compile-time
+ * constant from layout.json and the stage invariant is that a plate may align
+ * itself and may not move the composite, so the case this field was built for
+ * cannot arise.
+ *
+ * Meanwhile a left panel spans x=6..150 and the plant column is at 158. With
+ * the old procedural pot, 68 wide, that clipped 26px of it; with the authored
+ * sheet, 176 wide, it covers 80px. Two scenes had chosen LEFT to keep the HUD
+ * off their dressing -- the desk lamp, the bathroom shelf -- and paid for it
+ * with the subject of the game. The plant wins: dressing is what a panel is
+ * allowed to cover.
+ *
+ * The field stays because the day the plant does move, mirroring is the right
+ * answer. pg_ui_panel_clears_plant() below is what stops it being chosen
+ * wrongly again. */
 #define PG_UI_PANEL_W  (PG_LOGICAL_WIDTH - PG_PANEL_X - 6)
+#define PG_UI_PANEL_LEFT_X 6
+
+/* Does a panel on this side clear the plant column? The pot is the widest
+ * thing in that column, so it is what the test has to miss. */
+bool pg_ui_panel_clears_plant(int panel_side, int pot_width)
+{
+    int half = pot_width / 2;
+    int plant_lo = PG_POT_CX - half;
+    int plant_hi = PG_POT_CX + half;
+    int panel_lo = panel_side == (int)PG_PANEL_LEFT
+                 ? PG_UI_PANEL_LEFT_X : PG_PANEL_X;
+    int panel_hi = panel_lo + PG_UI_PANEL_W;
+
+    return panel_hi <= plant_lo || panel_lo >= plant_hi;
+}
 #define PG_UI_PANEL_Y  8
 
 void pg_ui_init(pg_ui_state *ui)

@@ -91,4 +91,8 @@ void pg_ui_draw(ki_td_soft_renderer *renderer, const ki_td_view *view,
                 const pg_state *state, const pg_ui_state *ui,
                 const pg_graphics *graphics);
 
+/* True when a HUD panel on this side does not overlap the plant column.
+ * The pot is the widest thing there, so its width is the input. */
+bool pg_ui_panel_clears_plant(int panel_side, int pot_width);
+
 #endif /* PG_UI_H */

@@ -17,6 +17,7 @@
 #include "pg_scene.h"
 #include "pg_sim.h"
 #include "pg_state.h"
+#include "pg_ui.h"
 
 #include "kilix_top_down_soft.h"
 #include "kilix_top_down_view.h"
@@ -71,7 +72,7 @@
  * instead of failing. That is the only supported way to move it, and it is
  * deliberately not a flag: re-freezing must be a thing somebody decided to do,
  * not something a test run can do by accident. */
-#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x35efea6e0312688a)
+#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x3e3ef41ed3fddcb1)
 
 static int pg_render_test_failures;
 
@@ -640,6 +641,21 @@ int pg_render_run_test(uint64_t seed, const char *directory)
      * That covers both halves at once -- the absent plate changed nothing, and
      * the scene selection reached the screen. background-off is index
      * PG_SCENE_COUNT and lights from the front. */
+    /* No scene may put the HUD on top of the plant.
+     *
+     * Two scenes had chosen a left panel to keep the HUD off their dressing,
+     * which put it over the subject instead: a left panel spans x=6..150 and
+     * the plant column is at 158, so it clipped the pot by 26px while the pot
+     * was procedural and 68 wide, and by 80px once the authored sheet, 176
+     * wide, was drawn. Nothing checked it, so the first version was invisible
+     * and the second was only found by looking at a screenshot. The pot width
+     * is the input because the pot is the widest thing in that column. */
+    for (index = 0u; index < (size_t)PG_SCENE_COUNT; ++index) {
+        render_check(pg_ui_panel_clears_plant(
+                         (int)graphics.scenes[index].panel_side, 176),
+                     "a scene puts the HUD panel over the plant column");
+    }
+
     for (index = 0u; index <= (size_t)PG_SCENE_COUNT; ++index) {
         size_t other;
         uint8_t light_a = (index == (size_t)PG_SCENE_COUNT)

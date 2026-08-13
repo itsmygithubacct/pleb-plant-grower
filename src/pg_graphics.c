@@ -50,13 +50,13 @@ static const pg_scene_seed PG_SCENE_SEEDS[PG_SCENE_COUNT] = {
      UINT32_C(0xf6efe0), UINT32_C(0x141109), true},
     {"bright-corner", "Bright Corner", 0, -59, PG_PANEL_RIGHT, PG_LIGHT_FROM_LEFT,
      UINT32_C(0xf2e9d8), UINT32_C(0x12100e), false},
-    {"study-desk",    "Study Desk", 0, -17,    PG_PANEL_LEFT,  PG_LIGHT_FROM_RIGHT,
+    {"study-desk",    "Study Desk", 0, -17,    PG_PANEL_RIGHT,  PG_LIGHT_FROM_RIGHT,
      UINT32_C(0xece3d2), UINT32_C(0x100e0c), true},
     {"plain-studio",  "Plain Studio", 0, -13,  PG_PANEL_RIGHT, PG_LIGHT_FROM_FRONT,
      UINT32_C(0xf2e9d8), UINT32_C(0x12100e), false},
     {"kitchen-shelf", "Kitchen Shelf", 0, -43, PG_PANEL_RIGHT, PG_LIGHT_FROM_RIGHT,
      UINT32_C(0xf4ecdc), UINT32_C(0x11100d), false},
-    {"steamy-bath",   "Steamy Bath", 0, -13,   PG_PANEL_LEFT,  PG_LIGHT_FROM_FRONT,
+    {"steamy-bath",   "Steamy Bath", 0, -13,   PG_PANEL_RIGHT,  PG_LIGHT_FROM_FRONT,
      UINT32_C(0xeef0ea), UINT32_C(0x0e1211), true}
 };
 
