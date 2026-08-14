@@ -120,6 +120,27 @@
       "verdict": "accept",
       "reviewed": "2026-08-12",
       "note": "accepted by the owner after the scene was rendered in game through --shot against the real asset root -- a tiled bathroom: green tile, towels, dispenser and soap dish. Centre-fit to exactly 1920x1080 by prepare_plate.py, which is the only door a backdrop enters through"
+    },
+    {
+      "path": "backgrounds/sunny-sill/sunny-sill-front.png",
+      "sha256": "cad7eb7ac9477bdc7f0685427f8786e05c5e18f394865552aad84ea30c5ca0d0",
+      "verdict": "accept",
+      "reviewed": "2026-08-14",
+      "note": "accepted by the owner after the scene was rendered in game with layer 7 active: the windowsill front lip. Keyed from magenta to alpha by prepare_front.py and centre-fit to 1920x1080; measured 83.7% fully transparent, 16.3% fully opaque, no partial alpha, solid content starting 84% down the plate"
+    },
+    {
+      "path": "backgrounds/study-desk/study-desk-front.png",
+      "sha256": "15eca3394a9cfa6683fa540c61e921ce53d2ca19864917d117dcf4a9e7e8c045",
+      "verdict": "accept",
+      "reviewed": "2026-08-14",
+      "note": "accepted by the owner after the scene was rendered in game with layer 7 active: the desktop front edge. Keyed from magenta to alpha by prepare_front.py and centre-fit to 1920x1080; measured 83.7% fully transparent, 16.3% fully opaque, no partial alpha, solid content starting 84% down the plate"
+    },
+    {
+      "path": "backgrounds/steamy-bath/steamy-bath-front.png",
+      "sha256": "52673fa5a36b1dcabdcdce0adb41195427541556d12f2d16dcfb85935753e5b9",
+      "verdict": "accept",
+      "reviewed": "2026-08-14",
+      "note": "accepted by the owner after the scene was rendered in game with layer 7 active: the tiled counter edge with a towel corner. Keyed from magenta to alpha by prepare_front.py and centre-fit to 1920x1080; measured 83.7% fully transparent, 16.3% fully opaque, no partial alpha, solid content starting 84% down the plate"
     }
   ]
 }

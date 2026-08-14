@@ -309,6 +309,39 @@
       "masters": [
         "source/background-steamy-bath.png"
       ]
+    },
+    {
+      "path": "backgrounds/sunny-sill/sunny-sill-front.png",
+      "kind": "front-overlay",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": true,
+      "sha256": "cad7eb7ac9477bdc7f0685427f8786e05c5e18f394865552aad84ea30c5ca0d0",
+      "masters": [
+        "source/sunny-sill-front-chroma.png"
+      ]
+    },
+    {
+      "path": "backgrounds/study-desk/study-desk-front.png",
+      "kind": "front-overlay",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": true,
+      "sha256": "15eca3394a9cfa6683fa540c61e921ce53d2ca19864917d117dcf4a9e7e8c045",
+      "masters": [
+        "source/study-desk-front-chroma.png"
+      ]
+    },
+    {
+      "path": "backgrounds/steamy-bath/steamy-bath-front.png",
+      "kind": "front-overlay",
+      "width": 1920,
+      "height": 1080,
+      "alpha_required": true,
+      "sha256": "52673fa5a36b1dcabdcdce0adb41195427541556d12f2d16dcfb85935753e5b9",
+      "masters": [
+        "source/steamy-bath-front-chroma.png"
+      ]
     }
   ]
 }

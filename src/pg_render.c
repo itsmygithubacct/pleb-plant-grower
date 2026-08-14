@@ -631,12 +631,18 @@ static void draw_overlays(ki_td_soft_renderer *renderer,
                           const pg_care_env *env)
 {
     /* Night is a look, not a filter on the simulation: a cool wash after dusk
-     * so the calathea's fold reads as evening rather than as damage. */
+     * so the calathea's fold reads as evening rather than as damage.
+     *
+     * This was 0.22, which on a brightly lit plate moved a cream wall by
+     * three RGB units -- present in the buffer, invisible on screen, so the
+     * folded calathea read as a daytime plant that had wilted. 0.45 is dusk
+     * you can see while the room is still legible; the backdrops are lit for
+     * day and anything less does not survive them. */
     if (!env->is_daylight) {
         ki_td_soft_fill_rect(renderer, view, 0.0f, 0.0f,
                              (float)PG_LOGICAL_WIDTH,
                              (float)PG_LOGICAL_HEIGHT,
-                             UINT32_C(0x101a2c), 0.22f);
+                             UINT32_C(0x101a2c), 0.45f);
     }
     if (plant->life_state == (uint8_t)PG_LIFE_DEAD) {
         return;

@@ -72,7 +72,7 @@
  * instead of failing. That is the only supported way to move it, and it is
  * deliberately not a flag: re-freezing must be a thing somebody decided to do,
  * not something a test run can do by accident. */
-#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x3e3ef41ed3fddcb1)
+#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x6cce938829806a2c)
 
 static int pg_render_test_failures;
 
