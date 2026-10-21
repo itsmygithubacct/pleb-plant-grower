@@ -329,6 +329,12 @@ void pg_graphics_shutdown(pg_graphics *graphics)
             graphics->plant_atlas_valid[index] = false;
         }
         graphics->plant_atlas_count = 0u;
+        /* The overlay sheets were never released here, which a host that
+         * zeroes its record after shutdown turns into a leak. */
+        for (index = 0u; index < (size_t)PG_OVERLAY_COUNT; ++index) {
+            kilix_asset_image_clear(&graphics->overlay_atlas[index]);
+            graphics->overlay_valid[index] = false;
+        }
     }
     release_plates(graphics);
     graphics->scene = PG_SCENE_NONE;

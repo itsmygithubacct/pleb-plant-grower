@@ -32,6 +32,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cells. Both were kilix-ui bugs, fixed in kilix-ui 0.4.1. The SDK pin moves
   to that fix alone, so pleb-plant-grower and kilix-land still build from one
   SDK commit.
+- `pg_graphics_shutdown` released the plant atlases and plates but not the
+  four overlay sheets, so a host that zeroed its record afterwards leaked
+  them. The embed test now checks every image is released, and
+  `make sanitize` covers the render and embed tests as well.
 
 ### Not yet included
 

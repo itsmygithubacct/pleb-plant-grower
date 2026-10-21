@@ -308,7 +308,7 @@ sanitize:
 	ASAN_OPTIONS=abort_on_error=1:halt_on_error=1:detect_leaks=1 \
 	UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
 	$(MAKE) CFLAGS="$(SANITIZE_CFLAGS)" LDFLAGS="$(SANITIZE_LDFLAGS)" \
-	        test-cli test-headless test-unit test-save
+	        test-cli test-headless test-unit test-save test-render test-embed
 
 test-clang:
 	$(MAKE) clean

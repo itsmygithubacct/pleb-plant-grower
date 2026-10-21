@@ -130,6 +130,35 @@ static void test_render_against_a_host_renderer(void)
     ki_td_soft_renderer_destroy(&renderer);
 }
 
+/* A host keeps no pg_graphics between visits: kilix-land loads the sheets
+ * on its first entry and zeroes the record after shutdown. Every image init
+ * loaded must be released by then, or zeroing the record leaks it, and no
+ * exit-time leak check would see it in a host that keeps the record alive. */
+static void test_graphics_released(void)
+{
+    static pg_graphics graphics;
+    char error[160];
+    size_t index;
+    size_t overlays = 0u;
+
+    CHECK(pg_graphics_init(&graphics, "assets", error, sizeof error));
+    for (index = 0u; index < (size_t)PG_OVERLAY_COUNT; ++index)
+        if (graphics.overlay_valid[index]) overlays++;
+    /* Without a loaded overlay the overlay checks below would be vacuous. */
+    CHECK(overlays > 0u);
+    pg_graphics_shutdown(&graphics);
+    for (index = 0u; index < (size_t)PG_OVERLAY_COUNT; ++index) {
+        CHECK(graphics.overlay_atlas[index].pixels == NULL);
+        CHECK(!graphics.overlay_valid[index]);
+    }
+    for (index = 0u; index < (size_t)PG_SPECIES_COUNT; ++index) {
+        CHECK(graphics.plant_atlas[index].pixels == NULL);
+        CHECK(!graphics.plant_atlas_valid[index]);
+    }
+    CHECK(graphics.plate.pixels == NULL);
+    CHECK(graphics.front.pixels == NULL);
+}
+
 /* Audio is take-and-clear so a host can route our events into its own
  * vocabulary. kilix-land has fourteen semantic events and we have seventeen
  * kinds; the mapping is the host's business, and this asserts only that the
@@ -154,6 +183,7 @@ int main(void)
     test_abi();
     test_lifecycle();
     test_render_against_a_host_renderer();
+    test_graphics_released();
     test_audio_handoff();
 
     if (failures != 0) {
@@ -161,6 +191,7 @@ int main(void)
         return 1;
     }
     (void)printf("PASS embed: archive-only link, ABI %zu bytes, catch-up "
-                 "idempotent, render pure\n", pg_state_size());
+                 "idempotent, render pure, graphics released\n",
+                 pg_state_size());
     return 0;
 }
