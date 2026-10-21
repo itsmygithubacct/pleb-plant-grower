@@ -71,8 +71,14 @@
  * Set PG_RENDER_GOLDEN_REFREEZE=1 in the environment to print the new value
  * instead of failing. That is the only supported way to move it, and it is
  * deliberately not a flag: re-freezing must be a thing somebody decided to do,
- * not something a test run can do by accident. */
-#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x6cce938829806a2c)
+ * not something a test run can do by accident.
+ *
+ * One re-freeze outside that plan, on 2026-10-21: kilix-ui 0.4.1 fixed the
+ * calendar's day numbers, which were numbered from the first grid cell
+ * rather than the first of the month. screen-calendar is the only fixture
+ * that moved, and it now shows June 2027 starting on a Tuesday and ending on
+ * the 30th. */
+#define PG_RENDER_GOLDEN_SUITE_HASH UINT64_C(0x6b9016ed59659290)
 
 static int pg_render_test_failures;
 
