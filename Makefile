@@ -165,7 +165,7 @@ test-cli: $(BIN)
 	test $$? -eq 2 || { echo "bad argument must exit 2" >&2; exit 1; }
 	@echo "test-cli: PASS"
 
-test-unit: $(PG_LIB) | $(BUILD)/tests
+test-unit: $(PG_LIB) $(APP_LIBS) | $(BUILD)/tests
 	@set -e; found=0; \
 	for t in tests/test_*.c; do \
 		[ -e "$$t" ] || continue; \
@@ -197,12 +197,12 @@ test-headless: $(BIN)
 # and deliberately not main.o or pg_term.o. If the archive ever grew a
 # dependency on the frontend, this is the only gate that would notice, because
 # every other one links the whole binary.
-test-embed: $(PG_LIB) | $(BUILD)/tests
+test-embed: $(PG_LIB) $(APP_LIBS) | $(BUILD)/tests
 	@$(CC) $(CPPFLAGS) $(CFLAGS) tests/test_embed.c $(PG_LIB) $(APP_LIBS) \
 		$(LDLIBS) -o $(BUILD)/tests/test-embed
 	@$(BUILD)/tests/test-embed
 
-test-noalloc: $(PG_LIB) | $(BUILD)/tests
+test-noalloc: $(PG_LIB) $(APP_LIBS) | $(BUILD)/tests
 	@$(CC) $(CPPFLAGS) $(CFLAGS) tests/test_noalloc.c $(PG_LIB) $(APP_LIBS) \
 		$(LDLIBS) -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free \
 		-o $(BUILD)/tests/test-noalloc
